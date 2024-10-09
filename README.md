@@ -1,6 +1,9 @@
-# Annotate It
+<p align="center">
+  <img src="https://github.com/namuan/annotate-it/raw/main/assets/icon.png" width="128px"/>
+</p>
+<h1 align="center">Draw, Label, Present—Your Ideas, Amplified</h1>
 
-Draw, Label, Present—Your Ideas, Amplified.
+![](assets/demo.gif)
 
 ## Getting Started
 
