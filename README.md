@@ -15,11 +15,20 @@ The app works with keyboard shortcuts.
 - `R/r`: Switch to rectangle drawing mode
 - `E/e`: Switch to ellipse drawing mode
 - `T/t`: Switch to text input mode
+- `H/h`: Toggle halo effect on/off
 - `C/c`: Clear all drawings
 - `Q/q`: Quit the application
 - `Ctrl+Z`: Undo last action
 - `Ctrl+Y`: Redo last undone action
 - `Cmd+, (Ctrl+, on Windows/Linux)`: Open configuration dialog
+
+## Halo Effect
+
+The application features a halo effect that highlights the cursor position and current drawing tool color.
+By default, the halo effect is enabled when the application starts.
+
+- To toggle the halo effect on or off, press the `H` or `h` key.
+- The halo color corresponds to the color of the currently selected drawing tool.
 
 ## Configuration
 

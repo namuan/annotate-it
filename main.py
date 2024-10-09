@@ -4,14 +4,18 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QPointF
 from PyQt6.QtCore import QRect
 from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QCursor
 from PyQt6.QtGui import QFont
 from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import QPainter
 from PyQt6.QtGui import QPen
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QRadialGradient
 from PyQt6.QtGui import QShortcut
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QColorDialog
@@ -85,6 +89,12 @@ class TransparentWindow(QWidget):
         self.font = QFont(self.default_font_family, self.default_font_size)
         self.drawingLayer = QPixmap(self.size())
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
+        self.cursor_pos = QPoint()
+        self.show_halo = False
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update)
+        self.update_timer.setInterval(16)  # ~60 FPS
+        QTimer.singleShot(1000, self.toggle_halo)
 
     def load_config(self):
         config = self.config_manager.load_config()
@@ -123,11 +133,21 @@ class TransparentWindow(QWidget):
         QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle"))
         QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse"))
         QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text"))
+        QShortcut(QKeySequence("H"), self, self.toggle_halo)
         QShortcut(QKeySequence("C"), self, self.clear_drawings)
         QShortcut(QKeySequence("Q"), self, self.close)
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo)
         QShortcut(QKeySequence("Ctrl+Y"), self, self.redo)
         QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog)
+
+    def toggle_halo(self):
+        self.show_halo = not self.show_halo
+        if self.show_halo:
+            self.update_timer.start()
+        else:
+            self.update_timer.stop()
+        self.update()
+        print(f"Halo effect {'enabled' if self.show_halo else 'disabled'}")
 
     def show_config_dialog(self):
         dialog = ConfigDialog(self)
@@ -164,7 +184,16 @@ class TransparentWindow(QWidget):
             self.update()
             print("Redo")
 
+    def update_cursor_pos(self):
+        if self.underMouse():
+            self.cursor_pos = self.mapFromGlobal(QCursor.pos())
+        else:
+            self.cursor_pos = QCursor.pos()
+
     def paintEvent(self, event):
+        if self.show_halo:
+            self.update_cursor_pos()
+
         qp = QPainter(self)
         qp.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -187,6 +216,41 @@ class TransparentWindow(QWidget):
                 qp.drawEllipse(
                     QRect(self.currentShape["start"], self.currentShape["end"])
                 )
+
+        if self.show_halo:
+            self.draw_halo(qp)
+
+    def get_current_shape_color(self):
+        if self.shape == "arrow":
+            return self.arrowColor
+        elif self.shape == "rectangle":
+            return self.rectColor
+        elif self.shape == "ellipse":
+            return self.ellipseColor
+        elif self.shape == "text":
+            return self.textColor
+        else:
+            return QColor(128, 128, 128)  # Default to gray if no shape is selected
+
+    def draw_halo(self, qp):
+        halo_radius = 20
+        cursor_pos_f = QPointF(self.cursor_pos)
+        gradient = QRadialGradient(cursor_pos_f, halo_radius)
+
+        shape_color = self.get_current_shape_color()
+
+        darker_color = shape_color.darker(150)
+
+        gradient.setColorAt(
+            0, QColor(shape_color.red(), shape_color.green(), shape_color.blue(), 100)
+        )
+        gradient.setColorAt(
+            1, QColor(darker_color.red(), darker_color.green(), darker_color.blue(), 75)
+        )
+
+        qp.setBrush(gradient)
+        qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawEllipse(cursor_pos_f, halo_radius, halo_radius)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -222,9 +286,10 @@ class TransparentWindow(QWidget):
         qp.end()
 
     def mouseMoveEvent(self, event):
+        self.cursor_pos = event.position().toPoint()
         if self.drawing:
-            self.currentShape["end"] = event.position().toPoint()
-            self.update()
+            self.currentShape["end"] = self.cursor_pos
+        self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self.drawing:
@@ -297,6 +362,7 @@ class ConfigDialog(QDialog):
             ("R", "Rectangle drawing mode"),
             ("E", "Ellipse drawing mode"),
             ("T", "Text input mode"),
+            ("H", "Toggle cursor halo effect"),
             ("C", "Clear all drawings"),
             ("Q", "Quit the application"),
             ("Ctrl+Z", "Undo last action"),
