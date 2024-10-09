@@ -114,7 +114,6 @@ class ConfigDialog(QDialog):
         self.setLayout(layout)
 
     def closeEvent(self, event):
-        # Update colors in the parent window when closing the dialog
         self.parent.arrowColor = self.arrowColorBtn.color
         self.parent.rectColor = self.rectColorBtn.color
         self.parent.ellipseColor = self.ellipseColorBtn.color
@@ -145,7 +144,7 @@ class TransparentWindow(QWidget):
         self.arrowColor = QColor(config.get("arrowColor", "#00FF00"))
         self.rectColor = QColor(config.get("rectColor", "#FF1493"))
         self.ellipseColor = QColor(config.get("ellipseColor", "#00BFFF"))
-        self.textColor = QColor(config.get("textColor", "#323232"))
+        self.textColor = QColor(config.get("textColor", "#AA26FF"))
 
     def save_config(self):
         config = {
@@ -169,7 +168,9 @@ class TransparentWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.showMaximized()
 
-        # Setup shortcuts
+        self.setup_shortcuts()
+
+    def setup_shortcuts(self):
         QShortcut(QKeySequence("A"), self, lambda: self.set_shape("arrow"))
         QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle"))
         QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse"))
@@ -219,14 +220,11 @@ class TransparentWindow(QWidget):
         qp = QPainter(self)
         qp.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Draw the semi-transparent background
-        qp.setBrush(QColor(0, 0, 0, 10))  # 40% opacity
+        qp.setBrush(QColor(0, 0, 0, 1))
         qp.drawRect(self.rect())
 
-        # Draw the shapes layer
         qp.drawPixmap(0, 0, self.drawingLayer)
 
-        # Draw the current shape being drawn
         if self.currentShape:
             if self.currentShape["type"] == "arrow":
                 qp.setPen(QPen(self.arrowColor, 4, Qt.PenStyle.SolidLine))
