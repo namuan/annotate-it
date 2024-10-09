@@ -21,6 +21,19 @@ The app works with keyboard shortcuts.
 - `Ctrl+Y`: Redo last undone action
 - `Cmd+, (Ctrl+, on Windows/Linux)`: Open configuration dialog
 
+## Configuration
+
+Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to open the configuration dialog. This dialog allows you to:
+
+- View all keyboard shortcuts
+- Customize colors for different drawing tools:
+    - Arrow color
+    - Rectangle color
+    - Ellipse color
+    - Text color
+
+Changes to colors are applied immediately after closing the configuration dialog.
+
 ## Getting Started
 
 * Install the required dependencies:

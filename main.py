@@ -1,4 +1,7 @@
+import json
+import os
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import QPoint
 from PyQt6.QtCore import QRect
@@ -19,6 +22,34 @@ from PyQt6.QtWidgets import QLabel
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
+
+
+class ConfigManager:
+    def __init__(self, app_name="annotate_it"):
+        self.app_name = app_name
+        self.config_file = self.get_config_dir() / "config.json"
+
+    def get_config_dir(self):
+        home = Path.home()
+        if sys.platform == "darwin":  # macOS
+            config_dir = home / "Library" / "Application Support" / self.app_name
+        elif sys.platform == "win32":  # Windows
+            config_dir = Path(os.getenv("APPDATA")) / self.app_name
+        else:  # Linux and other Unix-like
+            config_dir = home / ".config" / self.app_name.lower()
+
+        config_dir.mkdir(parents=True, exist_ok=True)
+        return config_dir
+
+    def load_config(self):
+        if self.config_file.exists():
+            with open(self.config_file) as f:
+                return json.load(f)
+        return {}
+
+    def save_config(self, config):
+        with open(self.config_file, "w") as f:
+            json.dump(config, f, indent=2)
 
 
 class QColorButton(QPushButton):
@@ -88,27 +119,47 @@ class ConfigDialog(QDialog):
         self.parent.rectColor = self.rectColorBtn.color
         self.parent.ellipseColor = self.ellipseColorBtn.color
         self.parent.textColor = self.textColorBtn.color
+        self.parent.save_config()
         super().closeEvent(event)
 
 
 class TransparentWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.config_manager = ConfigManager()
+        self.load_config()
         self.shapes = []
         self.init_ui()
         self.drawing = False
         self.lastPoint = QPoint()
-        self.shape = "arrow"  # Default to arrow
         self.currentShape = None
         self.undoStack = []
         self.redoStack = []
-        self.arrowColor = QColor(0, 255, 0)  # Fluorescent green
-        self.rectColor = QColor(255, 20, 147)  # Fluorescent pink
-        self.ellipseColor = QColor(0, 191, 255)  # Deep sky blue
-        self.textColor = QColor(50, 50, 50)  # Dark gray
-        self.font = QFont("Fantasque Sans Mono", 18)
+        self.font = QFont("Fantasque Sans Mono", 24)
         self.drawingLayer = QPixmap(self.size())
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
+
+    def load_config(self):
+        config = self.config_manager.load_config()
+        self.shape = config.get("shape", "arrow")
+        self.arrowColor = QColor(config.get("arrowColor", "#00FF00"))
+        self.rectColor = QColor(config.get("rectColor", "#FF1493"))
+        self.ellipseColor = QColor(config.get("ellipseColor", "#00BFFF"))
+        self.textColor = QColor(config.get("textColor", "#323232"))
+
+    def save_config(self):
+        config = {
+            "shape": self.shape,
+            "arrowColor": self.arrowColor.name(),
+            "rectColor": self.rectColor.name(),
+            "ellipseColor": self.ellipseColor.name(),
+            "textColor": self.textColor.name(),
+        }
+        self.config_manager.save_config(config)
+
+    def closeEvent(self, event):
+        self.save_config()
+        super().closeEvent(event)
 
     def init_ui(self):
         self.setWindowTitle("Transparent Drawing")
@@ -132,9 +183,11 @@ class TransparentWindow(QWidget):
     def show_config_dialog(self):
         dialog = ConfigDialog(self)
         dialog.exec()
+        self.redraw_shapes()
 
     def set_shape(self, shape):
         self.shape = shape
+        self.save_config()
         print(f"Current shape: {self.shape}")
 
     def clear_drawings(self):
