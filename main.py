@@ -266,7 +266,7 @@ class TransparentWindow(QWidget):
         qp.drawLine(end, right)
 
     def add_text(self, position):
-        text, ok = QInputDialog.getText(self, "Add Text", "Enter text:")
+        text, ok = QInputDialog.getText(self, "Enter text", None)
         if ok and text:
             self.undoStack.append(self.shapes.copy())
             self.shapes.append({"type": "text", "position": position, "text": text})
