@@ -11,12 +11,12 @@ The app works with keyboard shortcuts.
 
 ### Keyboard Shortcuts
 
-- `A`: Switch to arrow drawing mode
-- `R`: Switch to rectangle drawing mode
-- `E`: Switch to ellipse drawing mode
-- `T`: Switch to text input mode
-- `C`: Clear all drawings
-- `Q`: Quit the application
+- `A/a`: Switch to arrow drawing mode
+- `R/r`: Switch to rectangle drawing mode
+- `E/e`: Switch to ellipse drawing mode
+- `T/t`: Switch to text input mode
+- `C/c`: Clear all drawings
+- `Q/q`: Quit the application
 - `Ctrl+Z`: Undo last action
 - `Ctrl+Y`: Redo last undone action
 - `Cmd+, (Ctrl+, on Windows/Linux)`: Open configuration dialog
