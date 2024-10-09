@@ -5,6 +5,22 @@
 
 ![](assets/demo.gif)
 
+## Usage
+
+The app works with keyboard shortcuts.
+
+### Keyboard Shortcuts
+
+- `A`: Switch to arrow drawing mode
+- `R`: Switch to rectangle drawing mode
+- `E`: Switch to ellipse drawing mode
+- `T`: Switch to text input mode
+- `C`: Clear all drawings
+- `Q`: Quit the application
+- `Ctrl+Z`: Undo last action
+- `Ctrl+Y`: Redo last undone action
+- `Cmd+, (Ctrl+, on Windows/Linux)`: Open configuration dialog
+
 ## Getting Started
 
 * Install the required dependencies:
@@ -18,9 +34,6 @@ pip install -r requirements.txt
 ```shell
 python main.py
 ```
-
-## Usage
-
 
 ## Contributing
 
