@@ -68,6 +68,9 @@ class QColorButton(QPushButton):
 
 
 class TransparentWindow(QWidget):
+    default_font_family: str = "HanziPen TC"
+    default_font_size: int = 36
+
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
@@ -79,7 +82,7 @@ class TransparentWindow(QWidget):
         self.currentShape = None
         self.undoStack = []
         self.redoStack = []
-        self.font = QFont("Fantasque Sans Mono", 24)
+        self.font = QFont(self.default_font_family, self.default_font_size)
         self.drawingLayer = QPixmap(self.size())
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
 
