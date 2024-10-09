@@ -67,61 +67,6 @@ class QColorButton(QPushButton):
             self.update()
 
 
-class ConfigDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent = parent
-        self.setWindowTitle("Configuration")
-        self.setFixedSize(500, 300)
-
-        layout = QVBoxLayout()
-        grid = QGridLayout()
-
-        shortcuts = [
-            ("A", "Arrow drawing mode"),
-            ("R", "Rectangle drawing mode"),
-            ("E", "Ellipse drawing mode"),
-            ("T", "Text input mode"),
-            ("C", "Clear all drawings"),
-            ("Q", "Quit the application"),
-            ("Ctrl+Z", "Undo last action"),
-            ("Ctrl+Y", "Redo last undone action"),
-            ("Cmd+, (Ctrl+, on Windows/Linux)", "Open this configuration dialog"),
-        ]
-
-        for i, (key, description) in enumerate(shortcuts):
-            grid.addWidget(QLabel(key), i, 0)
-            grid.addWidget(QLabel(description), i, 1)
-
-        # Add color buttons
-        grid.addWidget(QLabel("Arrow Color"), 0, 2)
-        self.arrowColorBtn = QColorButton(self.parent.arrowColor)
-        grid.addWidget(self.arrowColorBtn, 0, 3)
-
-        grid.addWidget(QLabel("Rectangle Color"), 1, 2)
-        self.rectColorBtn = QColorButton(self.parent.rectColor)
-        grid.addWidget(self.rectColorBtn, 1, 3)
-
-        grid.addWidget(QLabel("Ellipse Color"), 2, 2)
-        self.ellipseColorBtn = QColorButton(self.parent.ellipseColor)
-        grid.addWidget(self.ellipseColorBtn, 2, 3)
-
-        grid.addWidget(QLabel("Text Color"), 3, 2)
-        self.textColorBtn = QColorButton(self.parent.textColor)
-        grid.addWidget(self.textColorBtn, 3, 3)
-
-        layout.addLayout(grid)
-        self.setLayout(layout)
-
-    def closeEvent(self, event):
-        self.parent.arrowColor = self.arrowColorBtn.color
-        self.parent.rectColor = self.rectColorBtn.color
-        self.parent.ellipseColor = self.ellipseColorBtn.color
-        self.parent.textColor = self.textColorBtn.color
-        self.parent.save_config()
-        super().closeEvent(event)
-
-
 class TransparentWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -332,6 +277,61 @@ class TransparentWindow(QWidget):
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
         self.redraw_shapes()
         super().resizeEvent(event)
+
+
+class ConfigDialog(QDialog):
+    def __init__(self, parent: TransparentWindow = None):
+        super().__init__(parent)
+        self.parent: TransparentWindow = parent
+        self.setWindowTitle("Configuration")
+        self.setFixedSize(500, 300)
+
+        layout = QVBoxLayout()
+        grid = QGridLayout()
+
+        shortcuts = [
+            ("A", "Arrow drawing mode"),
+            ("R", "Rectangle drawing mode"),
+            ("E", "Ellipse drawing mode"),
+            ("T", "Text input mode"),
+            ("C", "Clear all drawings"),
+            ("Q", "Quit the application"),
+            ("Ctrl+Z", "Undo last action"),
+            ("Ctrl+Y", "Redo last undone action"),
+            ("Cmd+, (Ctrl+, on Windows/Linux)", "Open this configuration dialog"),
+        ]
+
+        for i, (key, description) in enumerate(shortcuts):
+            grid.addWidget(QLabel(key), i, 0)
+            grid.addWidget(QLabel(description), i, 1)
+
+        # Add color buttons
+        grid.addWidget(QLabel("Arrow Color"), 0, 2)
+        self.arrowColorBtn = QColorButton(self.parent.arrowColor)
+        grid.addWidget(self.arrowColorBtn, 0, 3)
+
+        grid.addWidget(QLabel("Rectangle Color"), 1, 2)
+        self.rectColorBtn = QColorButton(self.parent.rectColor)
+        grid.addWidget(self.rectColorBtn, 1, 3)
+
+        grid.addWidget(QLabel("Ellipse Color"), 2, 2)
+        self.ellipseColorBtn = QColorButton(self.parent.ellipseColor)
+        grid.addWidget(self.ellipseColorBtn, 2, 3)
+
+        grid.addWidget(QLabel("Text Color"), 3, 2)
+        self.textColorBtn = QColorButton(self.parent.textColor)
+        grid.addWidget(self.textColorBtn, 3, 3)
+
+        layout.addLayout(grid)
+        self.setLayout(layout)
+
+    def closeEvent(self, event):
+        self.parent.arrowColor = self.arrowColorBtn.color
+        self.parent.rectColor = self.rectColorBtn.color
+        self.parent.ellipseColor = self.ellipseColorBtn.color
+        self.parent.textColor = self.textColorBtn.color
+        self.parent.save_config()
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
