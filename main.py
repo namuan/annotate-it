@@ -80,6 +80,7 @@ class TransparentWindow(QWidget):
         self.config_manager = ConfigManager()
         self.load_config()
         self.shapes = []
+        self.shortcuts = []
         self.init_ui()
         self.drawing = False
         self.lastPoint = QPoint()
@@ -95,6 +96,20 @@ class TransparentWindow(QWidget):
         self.update_timer.timeout.connect(self.update)
         self.update_timer.setInterval(16)  # ~60 FPS
         QTimer.singleShot(1000, self.toggle_halo)
+
+        # For keeping text
+        self.current_text = ""
+        self.current_text_pos = None
+        self.is_typing = False
+        self.show_cursor = True
+        self.cursor_timer = QTimer(self)
+        self.cursor_timer.timeout.connect(self.blink_cursor)
+        self.cursor_timer.start(500)
+
+    def blink_cursor(self):
+        if self.is_typing:
+            self.show_cursor = not self.show_cursor
+            self.update()
 
     def load_config(self):
         config = self.config_manager.load_config()
@@ -129,16 +144,26 @@ class TransparentWindow(QWidget):
         self.setup_shortcuts()
 
     def setup_shortcuts(self):
-        QShortcut(QKeySequence("A"), self, lambda: self.set_shape("arrow"))
-        QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle"))
-        QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse"))
-        QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text"))
-        QShortcut(QKeySequence("H"), self, self.toggle_halo)
-        QShortcut(QKeySequence("C"), self, self.clear_drawings)
-        QShortcut(QKeySequence("Q"), self, self.close)
-        QShortcut(QKeySequence("Ctrl+Z"), self, self.undo)
-        QShortcut(QKeySequence("Ctrl+Y"), self, self.redo)
-        QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog)
+        self.shortcuts = [
+            QShortcut(QKeySequence("A"), self, lambda: self.set_shape("arrow")),
+            QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle")),
+            QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse")),
+            QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text")),
+            QShortcut(QKeySequence("H"), self, self.toggle_halo),
+            QShortcut(QKeySequence("C"), self, self.clear_drawings),
+            QShortcut(QKeySequence("Q"), self, self.close),
+            QShortcut(QKeySequence("Ctrl+Z"), self, self.undo),
+            QShortcut(QKeySequence("Ctrl+Y"), self, self.redo),
+            QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
+        ]
+
+    def disable_shortcuts(self):
+        for shortcut in self.shortcuts:
+            shortcut.setEnabled(False)
+
+    def enable_shortcuts(self):
+        for shortcut in self.shortcuts:
+            shortcut.setEnabled(True)
 
     def toggle_halo(self):
         self.show_halo = not self.show_halo
@@ -217,6 +242,20 @@ class TransparentWindow(QWidget):
                     QRect(self.currentShape["start"], self.currentShape["end"])
                 )
 
+        if self.is_typing and self.current_text_pos:
+            qp.setPen(QPen(self.textColor))
+            qp.setFont(self.font)
+            # Draw the current text
+            qp.drawText(self.current_text_pos, self.current_text)
+
+            # Draw the cursor
+            if self.show_cursor:
+                metrics = qp.fontMetrics()
+                text_width = metrics.horizontalAdvance(self.current_text)
+                cursor_x = self.current_text_pos.x() + text_width
+                cursor_y = self.current_text_pos.y()
+                qp.drawText(QPoint(cursor_x, cursor_y), "_")
+
         if self.show_halo:
             self.draw_halo(qp)
 
@@ -252,10 +291,79 @@ class TransparentWindow(QWidget):
         qp.setPen(Qt.PenStyle.NoPen)
         qp.drawEllipse(cursor_pos_f, halo_radius, halo_radius)
 
+    def focusOutEvent(self, event):
+        if self.is_typing and self.current_text:
+            self.undoStack.append(self.shapes.copy())
+            self.shapes.append(
+                {
+                    "type": "text",
+                    "position": self.current_text_pos,
+                    "text": self.current_text,
+                }
+            )
+            self.redraw_shapes()
+            self.redoStack.clear()
+            self.current_text = ""
+            self.current_text_pos = None
+            self.is_typing = False
+            self.enable_shortcuts()
+            self.update()
+        super().focusOutEvent(event)
+
+    def keyPressEvent(self, event):
+        if self.is_typing:
+            if event.key() == Qt.Key.Key_Return:
+                if self.current_text:
+                    self.undoStack.append(self.shapes.copy())
+                    self.shapes.append(
+                        {
+                            "type": "text",
+                            "position": self.current_text_pos,
+                            "text": self.current_text,
+                        }
+                    )
+                    self.redraw_shapes()
+                    self.redoStack.clear()
+                self.current_text = ""
+                self.current_text_pos = None
+                self.is_typing = False
+                self.enable_shortcuts()
+            elif (
+                event.key() == Qt.Key.Key_Escape
+            ):  # Add escape key to cancel text entry
+                self.current_text = ""
+                self.current_text_pos = None
+                self.is_typing = False
+                self.enable_shortcuts()  # Re-enable shortcuts when canceling
+            elif event.key() == Qt.Key.Key_Backspace:
+                self.current_text = self.current_text[:-1]
+            else:
+                self.current_text += event.text()
+            self.show_cursor = True
+            self.update()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             if self.shape == "text":
-                self.add_text(event.position().toPoint())
+                # Save current text before starting new one
+                if self.is_typing and self.current_text:
+                    self.undoStack.append(self.shapes.copy())
+                    self.shapes.append(
+                        {
+                            "type": "text",
+                            "position": self.current_text_pos,
+                            "text": self.current_text,
+                        }
+                    )
+                    self.redraw_shapes()
+                    self.redoStack.clear()
+
+                self.current_text_pos = event.position().toPoint()
+                self.is_typing = True
+                self.current_text = ""
+                self.show_cursor = True
+                self.disable_shortcuts()
+                self.update()
             else:
                 self.drawing = True
                 self.lastPoint = event.position().toPoint()
