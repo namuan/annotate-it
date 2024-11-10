@@ -118,6 +118,7 @@ class TransparentWindow(QWidget):
         self.rectColor = QColor(config.get("rectColor", "#FF1493"))
         self.ellipseColor = QColor(config.get("ellipseColor", "#00BFFF"))
         self.textColor = QColor(config.get("textColor", "#AA26FF"))
+        self.lineColor = QColor(config.get("lineColor", "#FFFF00"))
 
     def save_config(self):
         config = {
@@ -126,6 +127,7 @@ class TransparentWindow(QWidget):
             "rectColor": self.rectColor.name(),
             "ellipseColor": self.ellipseColor.name(),
             "textColor": self.textColor.name(),
+            "lineColor": self.lineColor.name(),
         }
         self.config_manager.save_config(config)
 
@@ -145,6 +147,7 @@ class TransparentWindow(QWidget):
 
     def setup_shortcuts(self):
         self.shortcuts = [
+            QShortcut(QKeySequence("L"), self, lambda: self.set_shape("line")),
             QShortcut(QKeySequence("A"), self, lambda: self.set_shape("arrow")),
             QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle")),
             QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse")),
@@ -233,6 +236,9 @@ class TransparentWindow(QWidget):
                 self.draw_arrow(
                     qp, self.currentShape["start"], self.currentShape["end"]
                 )
+            elif self.currentShape["type"] == "line":
+                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.drawLine(self.currentShape["start"], self.currentShape["end"])
             elif self.currentShape["type"] == "rectangle":
                 qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
                 qp.drawRect(QRect(self.currentShape["start"], self.currentShape["end"]))
@@ -260,7 +266,9 @@ class TransparentWindow(QWidget):
             self.draw_halo(qp)
 
     def get_current_shape_color(self):
-        if self.shape == "arrow":
+        if self.shape == "line":
+            return self.lineColor
+        elif self.shape == "arrow":
             return self.arrowColor
         elif self.shape == "rectangle":
             return self.rectColor
@@ -381,6 +389,9 @@ class TransparentWindow(QWidget):
             if shape["type"] == "arrow":
                 qp.setPen(QPen(self.arrowColor, 4, Qt.PenStyle.SolidLine))
                 self.draw_arrow(qp, shape["start"], shape["end"])
+            elif shape["type"] == "line":
+                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.drawLine(shape["start"], shape["end"])
             elif shape["type"] == "rectangle":
                 qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
                 qp.drawRect(QRect(shape["start"], shape["end"]))
@@ -469,6 +480,7 @@ class ConfigDialog(QDialog):
             ("A", "Arrow drawing mode"),
             ("R", "Rectangle drawing mode"),
             ("E", "Ellipse drawing mode"),
+            ("L", "Line drawing mode"),
             ("T", "Text input mode"),
             ("H", "Toggle cursor halo effect"),
             ("C", "Clear all drawings"),
@@ -495,9 +507,13 @@ class ConfigDialog(QDialog):
         self.ellipseColorBtn = QColorButton(self.parent.ellipseColor)
         grid.addWidget(self.ellipseColorBtn, 2, 3)
 
-        grid.addWidget(QLabel("Text Color"), 3, 2)
+        grid.addWidget(QLabel("Line Color"), 3, 2)
+        self.lineColorBtn = QColorButton(self.parent.lineColor)
+        grid.addWidget(self.lineColorBtn, 3, 3)
+
+        grid.addWidget(QLabel("Text Color"), 4, 2)
         self.textColorBtn = QColorButton(self.parent.textColor)
-        grid.addWidget(self.textColorBtn, 3, 3)
+        grid.addWidget(self.textColorBtn, 4, 3)
 
         layout.addLayout(grid)
         self.setLayout(layout)
@@ -506,6 +522,7 @@ class ConfigDialog(QDialog):
         self.parent.arrowColor = self.arrowColorBtn.color
         self.parent.rectColor = self.rectColorBtn.color
         self.parent.ellipseColor = self.ellipseColorBtn.color
+        self.parent.lineColor = self.lineColorBtn.color
         self.parent.textColor = self.textColorBtn.color
         self.parent.save_config()
         super().closeEvent(event)
