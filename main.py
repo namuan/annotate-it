@@ -92,6 +92,7 @@ class TransparentWindow(QWidget):
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
         self.cursor_pos = QPoint()
         self.show_halo = False
+        self.filled_shapes = False
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update)
         self.update_timer.setInterval(16)  # ~60 FPS
@@ -153,6 +154,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse")),
             QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text")),
             QShortcut(QKeySequence("H"), self, self.toggle_halo),
+            QShortcut(QKeySequence("F"), self, self.toggle_filled_shapes),
             QShortcut(QKeySequence("C"), self, self.clear_drawings),
             QShortcut(QKeySequence("Q"), self, self.close),
             QShortcut(QKeySequence("Ctrl+Z"), self, self.undo),
@@ -167,6 +169,10 @@ class TransparentWindow(QWidget):
     def enable_shortcuts(self):
         for shortcut in self.shortcuts:
             shortcut.setEnabled(True)
+
+    def toggle_filled_shapes(self):
+        self.filled_shapes = not self.filled_shapes
+        print(f"Filled shapes {'enabled' if self.filled_shapes else 'disabled'}")
 
     def toggle_halo(self):
         self.show_halo = not self.show_halo
@@ -236,25 +242,31 @@ class TransparentWindow(QWidget):
                 self.draw_arrow(
                     qp, self.currentShape["start"], self.currentShape["end"]
                 )
-            elif self.currentShape["type"] == "line":
-                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
-                qp.drawLine(self.currentShape["start"], self.currentShape["end"])
             elif self.currentShape["type"] == "rectangle":
                 qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
+                if self.filled_shapes:
+                    qp.setBrush(self.rectColor)
+                else:
+                    qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawRect(QRect(self.currentShape["start"], self.currentShape["end"]))
             elif self.currentShape["type"] == "ellipse":
                 qp.setPen(QPen(self.ellipseColor, 4, Qt.PenStyle.SolidLine))
+                if self.filled_shapes:
+                    qp.setBrush(self.ellipseColor)
+                else:
+                    qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawEllipse(
                     QRect(self.currentShape["start"], self.currentShape["end"])
                 )
+            elif self.currentShape["type"] == "line":
+                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.drawLine(self.currentShape["start"], self.currentShape["end"])
 
         if self.is_typing and self.current_text_pos:
             qp.setPen(QPen(self.textColor))
             qp.setFont(self.font)
-            # Draw the current text
             qp.drawText(self.current_text_pos, self.current_text)
 
-            # Draw the cursor
             if self.show_cursor:
                 metrics = qp.fontMetrics()
                 text_width = metrics.horizontalAdvance(self.current_text)
@@ -379,6 +391,7 @@ class TransparentWindow(QWidget):
                     "type": self.shape,
                     "start": self.lastPoint,
                     "end": self.lastPoint,
+                    "filled": self.filled_shapes,
                 }
 
     def redraw_shapes(self):
@@ -389,15 +402,23 @@ class TransparentWindow(QWidget):
             if shape["type"] == "arrow":
                 qp.setPen(QPen(self.arrowColor, 4, Qt.PenStyle.SolidLine))
                 self.draw_arrow(qp, shape["start"], shape["end"])
-            elif shape["type"] == "line":
-                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
-                qp.drawLine(shape["start"], shape["end"])
             elif shape["type"] == "rectangle":
                 qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
+                if shape.get("filled", False):
+                    qp.setBrush(self.rectColor)
+                else:
+                    qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawRect(QRect(shape["start"], shape["end"]))
             elif shape["type"] == "ellipse":
                 qp.setPen(QPen(self.ellipseColor, 4, Qt.PenStyle.SolidLine))
+                if shape.get("filled", False):
+                    qp.setBrush(self.ellipseColor)
+                else:
+                    qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawEllipse(QRect(shape["start"], shape["end"]))
+            elif shape["type"] == "line":
+                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.drawLine(shape["start"], shape["end"])
             elif shape["type"] == "text":
                 qp.setPen(QPen(self.textColor))
                 qp.setFont(self.font)
@@ -482,6 +503,7 @@ class ConfigDialog(QDialog):
             ("E", "Ellipse drawing mode"),
             ("L", "Line drawing mode"),
             ("T", "Text input mode"),
+            ("F", "Toggle filled shapes"),
             ("H", "Toggle cursor halo effect"),
             ("C", "Clear all drawings"),
             ("Q", "Quit the application"),
