@@ -93,6 +93,9 @@ class TransparentWindow(QWidget):
         self.cursor_pos = QPoint()
         self.show_halo = False
         self.filled_shapes = False
+        self.opacity_levels = [255, 128, 64]
+        self.current_opacity_index = 1
+        self.current_opacity = self.opacity_levels[self.current_opacity_index]
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update)
         self.update_timer.setInterval(16)  # ~60 FPS
@@ -155,12 +158,20 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text")),
             QShortcut(QKeySequence("H"), self, self.toggle_halo),
             QShortcut(QKeySequence("F"), self, self.toggle_filled_shapes),
+            QShortcut(QKeySequence("O"), self, self.cycle_opacity),
             QShortcut(QKeySequence("C"), self, self.clear_drawings),
             QShortcut(QKeySequence("Q"), self, self.close),
             QShortcut(QKeySequence("Ctrl+Z"), self, self.undo),
             QShortcut(QKeySequence("Ctrl+Y"), self, self.redo),
             QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
         ]
+
+    def cycle_opacity(self):
+        self.current_opacity_index = (self.current_opacity_index + 1) % len(
+            self.opacity_levels
+        )
+        self.current_opacity = self.opacity_levels[self.current_opacity_index]
+        print(f"Opacity set to {int(self.current_opacity / 255 * 100)}%")
 
     def disable_shortcuts(self):
         for shortcut in self.shortcuts:
@@ -224,6 +235,9 @@ class TransparentWindow(QWidget):
         else:
             self.cursor_pos = QCursor.pos()
 
+    def get_color_with_opacity(self, color, opacity):
+        return QColor(color.red(), color.green(), color.blue(), opacity)
+
     def paintEvent(self, event):
         if self.show_halo:
             self.update_cursor_pos()
@@ -237,29 +251,44 @@ class TransparentWindow(QWidget):
         qp.drawPixmap(0, 0, self.drawingLayer)
 
         if self.currentShape:
+            opacity = self.currentShape.get("opacity", self.current_opacity)
             if self.currentShape["type"] == "arrow":
-                qp.setPen(QPen(self.arrowColor, 4, Qt.PenStyle.SolidLine))
+                qp.setPen(
+                    QPen(
+                        self.get_color_with_opacity(self.arrowColor, opacity),
+                        4,
+                        Qt.PenStyle.SolidLine,
+                    )
+                )
                 self.draw_arrow(
                     qp, self.currentShape["start"], self.currentShape["end"]
                 )
             elif self.currentShape["type"] == "rectangle":
-                qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
+                color = self.get_color_with_opacity(self.rectColor, opacity)
+                qp.setPen(QPen(color, 4, Qt.PenStyle.SolidLine))
                 if self.filled_shapes:
-                    qp.setBrush(self.rectColor)
+                    qp.setBrush(color)
                 else:
                     qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawRect(QRect(self.currentShape["start"], self.currentShape["end"]))
             elif self.currentShape["type"] == "ellipse":
-                qp.setPen(QPen(self.ellipseColor, 4, Qt.PenStyle.SolidLine))
+                color = self.get_color_with_opacity(self.ellipseColor, opacity)
+                qp.setPen(QPen(color, 4, Qt.PenStyle.SolidLine))
                 if self.filled_shapes:
-                    qp.setBrush(self.ellipseColor)
+                    qp.setBrush(color)
                 else:
                     qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawEllipse(
                     QRect(self.currentShape["start"], self.currentShape["end"])
                 )
             elif self.currentShape["type"] == "line":
-                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.setPen(
+                    QPen(
+                        self.get_color_with_opacity(self.lineColor, opacity),
+                        4,
+                        Qt.PenStyle.SolidLine,
+                    )
+                )
                 qp.drawLine(self.currentShape["start"], self.currentShape["end"])
 
         if self.is_typing and self.current_text_pos:
@@ -295,18 +324,20 @@ class TransparentWindow(QWidget):
         halo_radius = 20
         cursor_pos_f = QPointF(self.cursor_pos)
         gradient = QRadialGradient(cursor_pos_f, halo_radius)
-
         shape_color = self.get_current_shape_color()
-
         darker_color = shape_color.darker(150)
-
         gradient.setColorAt(
-            0, QColor(shape_color.red(), shape_color.green(), shape_color.blue(), 100)
+            0,
+            QColor(
+                shape_color.red(),
+                shape_color.green(),
+                shape_color.blue(),
+                self.current_opacity,
+            ),
         )
         gradient.setColorAt(
             1, QColor(darker_color.red(), darker_color.green(), darker_color.blue(), 75)
         )
-
         qp.setBrush(gradient)
         qp.setPen(Qt.PenStyle.NoPen)
         qp.drawEllipse(cursor_pos_f, halo_radius, halo_radius)
@@ -373,6 +404,7 @@ class TransparentWindow(QWidget):
                             "type": "text",
                             "position": self.current_text_pos,
                             "text": self.current_text,
+                            "opacity": self.current_opacity,
                         }
                     )
                     self.redraw_shapes()
@@ -392,6 +424,7 @@ class TransparentWindow(QWidget):
                     "start": self.lastPoint,
                     "end": self.lastPoint,
                     "filled": self.filled_shapes,
+                    "opacity": self.current_opacity,
                 }
 
     def redraw_shapes(self):
@@ -399,25 +432,40 @@ class TransparentWindow(QWidget):
         qp = QPainter(self.drawingLayer)
         qp.setRenderHint(QPainter.RenderHint.Antialiasing)
         for shape in self.shapes:
+            opacity = shape.get("opacity", 128)
             if shape["type"] == "arrow":
-                qp.setPen(QPen(self.arrowColor, 4, Qt.PenStyle.SolidLine))
+                qp.setPen(
+                    QPen(
+                        self.get_color_with_opacity(self.arrowColor, opacity),
+                        4,
+                        Qt.PenStyle.SolidLine,
+                    )
+                )
                 self.draw_arrow(qp, shape["start"], shape["end"])
             elif shape["type"] == "rectangle":
-                qp.setPen(QPen(self.rectColor, 4, Qt.PenStyle.SolidLine))
+                color = self.get_color_with_opacity(self.rectColor, opacity)
+                qp.setPen(QPen(color, 4, Qt.PenStyle.SolidLine))
                 if shape.get("filled", False):
-                    qp.setBrush(self.rectColor)
+                    qp.setBrush(color)
                 else:
                     qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawRect(QRect(shape["start"], shape["end"]))
             elif shape["type"] == "ellipse":
-                qp.setPen(QPen(self.ellipseColor, 4, Qt.PenStyle.SolidLine))
+                color = self.get_color_with_opacity(self.ellipseColor, opacity)
+                qp.setPen(QPen(color, 4, Qt.PenStyle.SolidLine))
                 if shape.get("filled", False):
-                    qp.setBrush(self.ellipseColor)
+                    qp.setBrush(color)
                 else:
                     qp.setBrush(Qt.BrushStyle.NoBrush)
                 qp.drawEllipse(QRect(shape["start"], shape["end"]))
             elif shape["type"] == "line":
-                qp.setPen(QPen(self.lineColor, 4, Qt.PenStyle.SolidLine))
+                qp.setPen(
+                    QPen(
+                        self.get_color_with_opacity(self.lineColor, opacity),
+                        4,
+                        Qt.PenStyle.SolidLine,
+                    )
+                )
                 qp.drawLine(shape["start"], shape["end"])
             elif shape["type"] == "text":
                 qp.setPen(QPen(self.textColor))
