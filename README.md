@@ -15,6 +15,9 @@ The app works with keyboard shortcuts.
 - `R/r`: Switch to rectangle drawing mode
 - `E/e`: Switch to ellipse drawing mode
 - `T/t`: Switch to text input mode
+- `L/l`: Switch to line drawing mode
+- `F/f`: Toggle filled shapes on/off
+- `O/o`: Cycle through opacity levels
 - `H/h`: Toggle halo effect on/off
 - `C/c`: Clear all drawings
 - `Q/q`: Quit the application
