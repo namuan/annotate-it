@@ -20,6 +20,7 @@ from PyQt6.QtGui import QShortcut
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QColorDialog
 from PyQt6.QtWidgets import QDialog
+from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtWidgets import QGridLayout
 from PyQt6.QtWidgets import QInputDialog
 from PyQt6.QtWidgets import QLabel
@@ -160,11 +161,52 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("F"), self, self.toggle_filled_shapes),
             QShortcut(QKeySequence("O"), self, self.cycle_opacity),
             QShortcut(QKeySequence("C"), self, self.clear_drawings),
+            QShortcut(QKeySequence("X"), self, self.export_to_image),
             QShortcut(QKeySequence("Q"), self, self.close),
             QShortcut(QKeySequence("Ctrl+Z"), self, self.undo),
             QShortcut(QKeySequence("Ctrl+Y"), self, self.redo),
             QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
         ]
+
+    def export_to_image(self):
+        if self.show_halo:
+            self.toggle_halo()
+            self.update()
+            QTimer.singleShot(50, lambda: self.actual_capture())
+        else:
+            self.actual_capture()
+
+    def actual_capture(self):
+        screen = QApplication.primaryScreen()
+        if screen:
+            # Capture only the area covered by the window
+            window_rect = self.frameGeometry()
+            screen_grab = screen.grabWindow(
+                0,
+                window_rect.x(),
+                window_rect.y(),
+                window_rect.width(),
+                window_rect.height(),
+            )
+
+            # Crop the image to match the window's content
+            pixmap = QPixmap(self.size())
+            painter = QPainter(pixmap)
+            painter.drawPixmap(0, 0, screen_grab)
+            painter.end()
+            pixmap = pixmap.copy(QRect(window_rect.topLeft(), window_rect.size()))
+
+            # Define where to save the image
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Image", "", "PNG Files (*.png);;"
+            )
+            if path:
+                pixmap.save(path, "PNG")  # or "JPG" if you prefer
+                print(f"Image saved to {path}")
+            else:
+                print("Image export cancelled")
+        else:
+            print("Screen capture failed")
 
     def cycle_opacity(self):
         self.current_opacity_index = (self.current_opacity_index + 1) % len(
