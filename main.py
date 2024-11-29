@@ -578,64 +578,79 @@ class TransparentWindow(QWidget):
 
 
 class ConfigDialog(QDialog):
-    def __init__(self, parent: TransparentWindow = None):
+    def __init__(self, parent):
         super().__init__(parent)
-        self.parent: TransparentWindow = parent
-        self.setWindowTitle("Configuration")
-        self.setFixedSize(500, 300)
+        self.parent = parent
+        self.init_ui()
+        # Set a minimum size for the dialog to prevent text cutoff
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(500)
 
+    def init_ui(self):
+        self.setWindowTitle("Keyboard Shortcuts")
         layout = QVBoxLayout()
-        grid = QGridLayout()
+        layout.setSpacing(10)  # Add spacing between elements
 
+        # Create grid layout for shortcuts
+        grid = QGridLayout()
+        grid.setSpacing(8)  # Add spacing between grid items
         shortcuts = [
-            ("A", "Arrow drawing mode"),
-            ("R", "Rectangle drawing mode"),
-            ("E", "Ellipse drawing mode"),
-            ("L", "Line drawing mode"),
-            ("T", "Text input mode"),
-            ("F", "Toggle filled shapes"),
-            ("H", "Toggle cursor halo effect"),
-            ("C", "Clear all drawings"),
-            ("Q", "Quit the application"),
-            ("Ctrl+Z", "Undo last action"),
-            ("Ctrl+Y", "Redo last undone action"),
-            ("Cmd+, (Ctrl+, on Windows/Linux)", "Open this configuration dialog"),
+            ("L", "Line Tool"),
+            ("A", "Arrow Tool"),
+            ("R", "Rectangle Tool"),
+            ("E", "Ellipse Tool"),
+            ("T", "Text Tool"),
+            ("H", "Toggle Halo Effect"),
+            ("F", "Toggle Filled Shapes"),
+            ("O", "Cycle Opacity (100% → 50% → 25%)"),
+            ("C", "Clear All Drawings"),
+            ("X", "Export to Image"),
+            ("Q", "Quit Application"),
+            ("Ctrl+Z", "Undo"),
+            ("Ctrl+Y", "Redo"),
+            ("Ctrl+,", "Show This Dialog"),
         ]
 
+        # Add shortcuts to grid
         for i, (key, description) in enumerate(shortcuts):
-            grid.addWidget(QLabel(key), i, 0)
-            grid.addWidget(QLabel(description), i, 1)
+            key_label = QLabel(f"<b>{key}</b>")
+            desc_label = QLabel(description)
+            desc_label.setWordWrap(True)  # Enable word wrap for long descriptions
+            grid.addWidget(key_label, i, 0)
+            grid.addWidget(desc_label, i, 1)
 
-        # Add color buttons
-        grid.addWidget(QLabel("Arrow Color"), 0, 2)
-        self.arrowColorBtn = QColorButton(self.parent.arrowColor)
-        grid.addWidget(self.arrowColorBtn, 0, 3)
+        # Add color selection buttons
+        color_layout = QGridLayout()
+        color_layout.setSpacing(8)  # Add spacing between color items
+        self.arrow_color = QColorButton(self.parent.arrowColor)
+        self.rect_color = QColorButton(self.parent.rectColor)
+        self.ellipse_color = QColorButton(self.parent.ellipseColor)
+        self.text_color = QColorButton(self.parent.textColor)
+        self.line_color = QColorButton(self.parent.lineColor)
 
-        grid.addWidget(QLabel("Rectangle Color"), 1, 2)
-        self.rectColorBtn = QColorButton(self.parent.rectColor)
-        grid.addWidget(self.rectColorBtn, 1, 3)
-
-        grid.addWidget(QLabel("Ellipse Color"), 2, 2)
-        self.ellipseColorBtn = QColorButton(self.parent.ellipseColor)
-        grid.addWidget(self.ellipseColorBtn, 2, 3)
-
-        grid.addWidget(QLabel("Line Color"), 3, 2)
-        self.lineColorBtn = QColorButton(self.parent.lineColor)
-        grid.addWidget(self.lineColorBtn, 3, 3)
-
-        grid.addWidget(QLabel("Text Color"), 4, 2)
-        self.textColorBtn = QColorButton(self.parent.textColor)
-        grid.addWidget(self.textColorBtn, 4, 3)
+        color_layout.addWidget(QLabel("Arrow Color:"), 0, 0)
+        color_layout.addWidget(self.arrow_color, 0, 1)
+        color_layout.addWidget(QLabel("Rectangle Color:"), 1, 0)
+        color_layout.addWidget(self.rect_color, 1, 1)
+        color_layout.addWidget(QLabel("Ellipse Color:"), 2, 0)
+        color_layout.addWidget(self.ellipse_color, 2, 1)
+        color_layout.addWidget(QLabel("Text Color:"), 3, 0)
+        color_layout.addWidget(self.text_color, 3, 1)
+        color_layout.addWidget(QLabel("Line Color:"), 4, 0)
+        color_layout.addWidget(self.line_color, 4, 1)
 
         layout.addLayout(grid)
+        layout.addSpacing(20)  # Add space between shortcuts and color section
+        layout.addLayout(color_layout)
+        layout.addStretch()  # Add stretch to push everything up
         self.setLayout(layout)
 
     def closeEvent(self, event):
-        self.parent.arrowColor = self.arrowColorBtn.color
-        self.parent.rectColor = self.rectColorBtn.color
-        self.parent.ellipseColor = self.ellipseColorBtn.color
-        self.parent.lineColor = self.lineColorBtn.color
-        self.parent.textColor = self.textColorBtn.color
+        self.parent.arrowColor = self.arrow_color.color
+        self.parent.rectColor = self.rect_color.color
+        self.parent.ellipseColor = self.ellipse_color.color
+        self.parent.textColor = self.text_color.color
+        self.parent.lineColor = self.line_color.color
         self.parent.save_config()
         super().closeEvent(event)
 

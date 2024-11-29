@@ -17,7 +17,7 @@ The app works with keyboard shortcuts.
 - `T/t`: Switch to text input mode
 - `L/l`: Switch to line drawing mode
 - `F/f`: Toggle filled shapes on/off
-- `O/o`: Cycle through opacity levels
+- `O/o`: Cycle through opacity levels (100% → 50% → 25%)
 - `H/h`: Toggle halo effect on/off
 - `C/c`: Clear all drawings
 - `Q/q`: Quit the application
@@ -43,6 +43,7 @@ Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to open the configuration dialog. T
     - Rectangle color
     - Ellipse color
     - Text color
+    - Line color
 
 Changes to colors are applied immediately after closing the configuration dialog.
 
