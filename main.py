@@ -20,7 +20,6 @@ from PyQt6.QtGui import QShortcut
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QColorDialog
 from PyQt6.QtWidgets import QDialog
-from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtWidgets import QGridLayout
 from PyQt6.QtWidgets import QInputDialog
 from PyQt6.QtWidgets import QLabel
@@ -196,15 +195,9 @@ class TransparentWindow(QWidget):
             painter.end()
             pixmap = pixmap.copy(QRect(window_rect.topLeft(), window_rect.size()))
 
-            # Define where to save the image
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save Image", "", "PNG Files (*.png);;"
-            )
-            if path:
-                pixmap.save(path, "PNG")  # or "JPG" if you prefer
-                print(f"Image saved to {path}")
-            else:
-                print("Image export cancelled")
+            clipboard = QApplication.clipboard()
+            clipboard.setPixmap(pixmap)
+            print("Image copied to clipboard")
         else:
             print("Screen capture failed")
 
