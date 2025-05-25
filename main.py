@@ -92,6 +92,7 @@ class TransparentWindow(QWidget):
         self.drawingLayer.fill(Qt.GlobalColor.transparent)
         self.cursor_pos = QPoint()
         self.show_halo = False
+        self.show_flashlight = False
         self.filled_shapes = False
         self.opacity_levels = [255, 128, 64]
         self.current_opacity_index = 1
@@ -165,6 +166,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("Ctrl+Z"), self, self.undo),
             QShortcut(QKeySequence("Ctrl+Y"), self, self.redo),
             QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
+            QShortcut(QKeySequence("Shift+F"), self, self.toggle_flashlight),
         ]
 
     def export_to_image(self):
@@ -222,7 +224,7 @@ class TransparentWindow(QWidget):
 
     def toggle_halo(self):
         self.show_halo = not self.show_halo
-        if self.show_halo:
+        if self.show_flashlight or self.show_halo:
             self.update_timer.start()
         else:
             self.update_timer.stop()
@@ -274,7 +276,7 @@ class TransparentWindow(QWidget):
         return QColor(color.red(), color.green(), color.blue(), opacity)
 
     def paintEvent(self, event):
-        if self.show_halo:
+        if self.show_halo or self.show_flashlight:
             self.update_cursor_pos()
 
         qp = QPainter(self)
@@ -340,6 +342,8 @@ class TransparentWindow(QWidget):
 
         if self.show_halo:
             self.draw_halo(qp)
+        if self.show_flashlight:
+            self.draw_flashlight(qp)
 
     def get_current_shape_color(self):
         if self.shape == "line":
@@ -354,6 +358,26 @@ class TransparentWindow(QWidget):
             return self.textColor
         else:
             return QColor(128, 128, 128)  # Default to gray if no shape is selected
+
+    def draw_flashlight(self, qp):
+        flashlight_radius = 80  # Large radius for visibility
+        cursor_pos_f = QPointF(self.cursor_pos)
+        gradient = QRadialGradient(cursor_pos_f, flashlight_radius)
+        gradient.setColorAt(0, QColor(255, 255, 0, 120))
+        gradient.setColorAt(0.5, QColor(255, 255, 0, 60))
+        gradient.setColorAt(1, QColor(255, 255, 0, 0))
+        qp.setBrush(gradient)
+        qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawEllipse(cursor_pos_f, flashlight_radius, flashlight_radius)
+
+    def toggle_flashlight(self):
+        self.show_flashlight = not self.show_flashlight
+        if self.show_flashlight or self.show_halo:
+            self.update_timer.start()
+        else:
+            self.update_timer.stop()
+        self.update()
+        print(f"Flashlight mode {'enabled' if self.show_flashlight else 'disabled'}")
 
     def draw_halo(self, qp):
         halo_radius = 20
