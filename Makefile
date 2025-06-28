@@ -19,7 +19,7 @@ clean: ## Clean package
 	rm -rf build dist
 
 package: clean pre-commit ## Run installer
-	pyinstaller main.spec
+	./venv/bin/pyinstaller main.spec
 
 install-macosx: package ## Installs application in users Application folder
 	./scripts/install-macosx.sh AnnotateIt.app
