@@ -28,6 +28,9 @@ package: clean pre-commit ## Run installer
 install-macosx: package ## Installs application in users Application folder
 	./scripts/install-macosx.sh AnnotateIt.app
 
+context: clean ## Build context file from application sources
+	llm-context-builder.py --extensions .py --ignored_dirs build dist generated venv .venv .idea .aider.tags.cache.v3 --print_contents --temp_file
+
 .PHONY: help
 .DEFAULT_GOAL := help
 
