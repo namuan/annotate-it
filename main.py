@@ -6,6 +6,7 @@ from pathlib import Path
 from PyQt6.QtCore import QPoint
 from PyQt6.QtCore import QPointF
 from PyQt6.QtCore import QRect
+from PyQt6.QtCore import QRectF
 from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
@@ -13,6 +14,7 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtGui import QFont
 from PyQt6.QtGui import QKeySequence
 from PyQt6.QtGui import QPainter
+from PyQt6.QtGui import QPainterPath
 from PyQt6.QtGui import QPen
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtGui import QRadialGradient
@@ -99,6 +101,9 @@ class TransparentWindow(QWidget):
         self.current_opacity = self.opacity_levels[self.current_opacity_index]
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update)
+        self.show_mouse_mask = False
+        self.mouse_mask_radius = 100
+        self.mouse_mask_alpha = 128
         self.update_timer.setInterval(16)  # ~60 FPS
         QTimer.singleShot(1000, self.toggle_halo)
 
@@ -158,6 +163,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse")),
             QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text")),
             QShortcut(QKeySequence("H"), self, self.toggle_halo),
+            QShortcut(QKeySequence("M"), self, self.toggle_mouse_mask),
             QShortcut(QKeySequence("F"), self, self.toggle_filled_shapes),
             QShortcut(QKeySequence("O"), self, self.cycle_opacity),
             QShortcut(QKeySequence("C"), self, self.clear_drawings),
@@ -224,12 +230,21 @@ class TransparentWindow(QWidget):
 
     def toggle_halo(self):
         self.show_halo = not self.show_halo
-        if self.show_flashlight or self.show_halo:
+        if self.show_flashlight or self.show_halo or self.show_mouse_mask:
             self.update_timer.start()
         else:
             self.update_timer.stop()
         self.update()
         print(f"Halo effect {'enabled' if self.show_halo else 'disabled'}")
+
+    def toggle_mouse_mask(self):
+        self.show_mouse_mask = not self.show_mouse_mask
+        if self.show_flashlight or self.show_halo or self.show_mouse_mask:
+            self.update_timer.start()
+        else:
+            self.update_timer.stop()
+        self.update()
+        print(f"Mouse mask {'enabled' if self.show_mouse_mask else 'disabled'}")
 
     def show_config_dialog(self):
         dialog = ConfigDialog(self)
@@ -267,16 +282,13 @@ class TransparentWindow(QWidget):
             print("Redo")
 
     def update_cursor_pos(self):
-        if self.underMouse():
-            self.cursor_pos = self.mapFromGlobal(QCursor.pos())
-        else:
-            self.cursor_pos = QCursor.pos()
+        self.cursor_pos = self.mapFromGlobal(QCursor.pos())
 
     def get_color_with_opacity(self, color, opacity):
         return QColor(color.red(), color.green(), color.blue(), opacity)
 
     def paintEvent(self, event):
-        if self.show_halo or self.show_flashlight:
+        if self.show_halo or self.show_flashlight or self.show_mouse_mask:
             self.update_cursor_pos()
 
         qp = QPainter(self)
@@ -344,6 +356,8 @@ class TransparentWindow(QWidget):
             self.draw_halo(qp)
         if self.show_flashlight:
             self.draw_flashlight(qp)
+        if self.show_mouse_mask:
+            self.draw_mouse_mask(qp)
 
     def get_current_shape_color(self):
         if self.shape == "line":
@@ -372,19 +386,18 @@ class TransparentWindow(QWidget):
 
     def toggle_flashlight(self):
         self.show_flashlight = not self.show_flashlight
-        if self.show_flashlight or self.show_halo:
+        if self.show_flashlight or self.show_halo or self.show_mouse_mask:
             self.update_timer.start()
         else:
             self.update_timer.stop()
         self.update()
-        print(f"Flashlight mode {'enabled' if self.show_flashlight else 'disabled'}")
+        print(f"Flashlight {'enabled' if self.show_flashlight else 'disabled'}")
 
     def draw_halo(self, qp):
         halo_radius = 20
         cursor_pos_f = QPointF(self.cursor_pos)
         gradient = QRadialGradient(cursor_pos_f, halo_radius)
         shape_color = self.get_current_shape_color()
-        darker_color = shape_color.darker(150)
         gradient.setColorAt(
             0,
             QColor(
@@ -395,11 +408,22 @@ class TransparentWindow(QWidget):
             ),
         )
         gradient.setColorAt(
-            1, QColor(darker_color.red(), darker_color.green(), darker_color.blue(), 75)
+            1, QColor(shape_color.red(), shape_color.green(), shape_color.blue(), 75)
         )
         qp.setBrush(gradient)
         qp.setPen(Qt.PenStyle.NoPen)
         qp.drawEllipse(cursor_pos_f, halo_radius, halo_radius)
+
+    def draw_mouse_mask(self, qp):
+        outer_path = QPainterPath()
+        outer_path.addRect(QRectF(self.rect()))
+
+        inner_path = QPainterPath()
+        center = QPointF(self.cursor_pos)
+        radius = self.mouse_mask_radius
+        inner_path.addEllipse(center, radius, radius)
+        mask_path = outer_path.subtracted(inner_path)
+        qp.fillPath(mask_path, QColor(0, 0, 0, self.mouse_mask_alpha))
 
     def focusOutEvent(self, event):
         if self.is_typing and self.current_text:
@@ -595,7 +619,7 @@ class TransparentWindow(QWidget):
 
 
 class ConfigDialog(QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent: TransparentWindow):
         super().__init__(parent)
         self.parent = parent
         self.init_ui()
@@ -626,6 +650,7 @@ class ConfigDialog(QDialog):
             ("Ctrl+Z", "Undo"),
             ("Ctrl+Y", "Redo"),
             ("Ctrl+,", "Show This Dialog"),
+            ("M", "Toggle Mouse Mask"),
         ]
 
         # Add shortcuts to grid
