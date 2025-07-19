@@ -3,6 +3,10 @@ PY=./venv/bin/python3
 
 .SILENT: ;               # no need for @
 
+setup: clean ## Re-initiates virtualenv
+	rm -rf venv
+	python3 -m venv venv
+
 deps: ## Install dependencies
 	$(PY) -m pip install --upgrade -r requirements-dev.txt
 	$(PY) -m pip install --upgrade pip
