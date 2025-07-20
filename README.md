@@ -1,7 +1,7 @@
-<p align="center">
-  <img src="https://github.com/namuan/annotate-it/raw/main/assets/icon.png" width="128px"/>
+<p style="text-align: center;">
+  <img alt="Application Logo" src="https://github.com/namuan/annotate-it/raw/main/assets/icon.png" width="128px"/>
 </p>
-<h1 align="center">Draw, Label, Present—Your Ideas, Amplified</h1>
+<h1 style="text-align: center;">Draw, Label, Present—Your Ideas, Amplified</h1>
 
 ![](assets/demo.gif)
 
