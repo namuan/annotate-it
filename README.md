@@ -5,6 +5,20 @@
 
 ![](assets/demo.gif)
 
+Supported annotations
+
+* **Line**: Draw straight lines on the screen.
+* **Arrow**: Draw arrows with customizable direction and color.
+* **Rectangle**: Draw rectangular shapes, with an option to fill.
+* **Ellipse**: Draw elliptical shapes, with an option to fill.
+* **Text**: Add text annotations at specific positions.
+
+The application also supports the following methods to track or highlight the cursor:
+
+* **Halo Effect**: Displays a radial gradient circle around the cursor, using the current shape's color with adjustable opacity. Toggled with the 'H' key.
+* **Flashlight Effect**: Creates a glowing circular effect around the cursor with a yellow gradient, simulating a flashlight. Toggled with the 'Shift+F' key.
+* **Mouse Mask Effect**: Applies a semi-transparent overlay across the screen, with a clear circular area around the cursor to highlight it. Toggled with the 'M' key.
+
 ## Usage
 
 The app works with keyboard shortcuts.
