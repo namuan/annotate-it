@@ -22,6 +22,9 @@ clean: ## Clean package
 	find . -type d -name '__pycache__' | xargs rm -rf
 	rm -rf build dist
 
+run: ## Runs the application
+	./venv/bin/python3 main.py
+
 package: clean pre-commit ## Run installer
 	./venv/bin/pyinstaller main.spec
 
