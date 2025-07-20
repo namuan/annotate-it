@@ -8,6 +8,7 @@
 ## Usage
 
 The app works with keyboard shortcuts.
+Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to quickly view all shortcuts.
 
 ### Keyboard Shortcuts
 
@@ -19,19 +20,14 @@ The app works with keyboard shortcuts.
 - `F/f`: Toggle filled shapes on/off
 - `O/o`: Cycle through opacity levels (100% → 50% → 25%)
 - `H/h`: Toggle halo effect on/off
+- `M/m`: Toggle mouse mask effect on/off
+- `Shift+F`: Toggle flashlight effect on/off
 - `C/c`: Clear all drawings
+- `X/x`: Export drawing to clipboard as image
 - `Q/q`: Quit the application
 - `Ctrl+Z`: Undo last action
 - `Ctrl+Y`: Redo last undone action
-- `Cmd+, (Ctrl+, on Windows/Linux)`: Open configuration dialog
-
-## Halo Effect
-
-The application features a halo effect that highlights the cursor position and current drawing tool color.
-By default, the halo effect is enabled when the application starts.
-
-- To toggle the halo effect on or off, press the `H` or `h` key.
-- The halo color corresponds to the color of the currently selected drawing tool.
+- `Ctrl+,`: Open configuration dialog
 
 ## Configuration
 
@@ -52,13 +48,19 @@ Changes to colors are applied immediately after closing the configuration dialog
 * Install the required dependencies:
 
 ```shell
-pip install -r requirements.txt
+make setup deps
 ```
 
 * Run the application:
 
 ```shell
-python main.py
+make run
+```
+
+* Create application for macOS and move it to ~/Applications
+
+```shell
+make install-macosx
 ```
 
 ## Contributing
