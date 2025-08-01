@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
+from monitor_selection_dialog import MonitorSelectionDialog
+
 
 class ConfigManager:
     """Manages loading and saving of application configuration."""
@@ -93,8 +95,9 @@ class TransparentWindow(QWidget):
     default_font_family: str = "HanziPen TC"
     default_font_size: int = 36
 
-    def __init__(self):
+    def __init__(self, target_screen=None):
         super().__init__()
+        self.target_screen = target_screen
         self.config_manager = ConfigManager()
         self.load_config()
         self.shapes = []
@@ -172,7 +175,13 @@ class TransparentWindow(QWidget):
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.showMaximized()
+        
+        # Position window on target screen or maximize on primary screen
+        if self.target_screen:
+            screen_geometry = self.target_screen.geometry()
+            self.setGeometry(screen_geometry)
+        else:
+            self.showMaximized()
 
         self.setup_shortcuts()
 
@@ -731,6 +740,20 @@ class ConfigDialog(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    ex = TransparentWindow()
+    
+    # Show monitor selection dialog if multiple monitors are available
+    screens = app.screens()
+    target_screen = None
+    
+    if len(screens) > 1:
+        dialog = MonitorSelectionDialog()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            target_screen = dialog.get_selected_screen()
+        else:
+            # User cancelled, exit application
+            sys.exit(0)
+    
+    # Create and show the main window
+    ex = TransparentWindow(target_screen)
     ex.show()
     sys.exit(app.exec())
