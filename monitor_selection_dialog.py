@@ -424,35 +424,3 @@ class MonitorSelectionDialog(QDialog):
 
         # Update OK button text
         self.ok_button.setText(f"Use Monitor {monitor_index + 1}")
-
-    def get_selected_monitor(self):
-        """Get the selected monitor index."""
-        return self.selected_monitor_index
-
-    def get_selected_screen(self):
-        """Get the selected QScreen object."""
-        app = QApplication.instance()
-        screens = app.screens()
-        if 0 <= self.selected_monitor_index < len(screens):
-            return screens[self.selected_monitor_index]
-        return None
-
-
-def main():
-    """Test the monitor selection dialog."""
-    QApplication(sys.argv)
-
-    dialog = MonitorSelectionDialog()
-    if dialog.exec() == QDialog.DialogCode.Accepted:
-        selected_monitor = dialog.get_selected_monitor()
-        selected_screen = dialog.get_selected_screen()
-        print(f"Selected monitor: {selected_monitor}")
-        if selected_screen:
-            print(f"Screen name: {selected_screen.name()}")
-            print(f"Geometry: {selected_screen.geometry()}")
-
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
