@@ -7,8 +7,6 @@ relative positions and allows users to select which monitor to use for the
 annotation window.
 """
 
-import sys
-
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor

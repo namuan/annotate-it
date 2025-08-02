@@ -94,7 +94,7 @@ Represents a single screen/monitor in the system.
 #### devicePixelRatio()
 - **Type**: `float`
 - **Description**: Ratio between physical pixels and device-independent pixels
-- **Common Values**: 
+- **Common Values**:
   - `1.0` for normal displays
   - `2.0` for "retina" displays
   - Higher values possible for high-DPI displays

@@ -175,7 +175,7 @@ class TransparentWindow(QWidget):
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        
+
         # Position window on target screen or maximize on primary screen
         if self.target_screen:
             screen_geometry = self.target_screen.geometry()
@@ -740,11 +740,11 @@ class ConfigDialog(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
+
     # Show monitor selection dialog if multiple monitors are available
     screens = app.screens()
     target_screen = None
-    
+
     if len(screens) > 1:
         dialog = MonitorSelectionDialog()
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -752,7 +752,7 @@ if __name__ == "__main__":
         else:
             # User cancelled, exit application
             sys.exit(0)
-    
+
     # Create and show the main window
     ex = TransparentWindow(target_screen)
     ex.show()

@@ -8,7 +8,7 @@ PyQt6 provides comprehensive support for high DPI displays with automatic scalin
 
 ### Device Pixel Ratio (DPR)
 - **Definition**: The ratio between physical pixels and device-independent pixels
-- **Examples**: 
+- **Examples**:
   - 1.0 = Standard DPI display
   - 2.0 = High DPI display (e.g., Retina)
   - 1.5 = Medium DPI display (e.g., 150% scaling)
@@ -52,7 +52,7 @@ app.setHighDpiScaleFactorRoundingPolicy(
 # Available policies:
 # - Round: Round to nearest integer
 # - Ceil: Always round up
-# - Floor: Always round down  
+# - Floor: Always round down
 # - RoundPreferFloor: Round, prefer floor for .5 values
 # - PassThrough: Use exact fractional values
 ```
@@ -102,7 +102,7 @@ for screen in screens:
 for screen in QApplication.screens():
     geometry = screen.availableGeometry()
     dpr = screen.devicePixelRatio()
-    
+
     if dpr > 1.5:
         print(f"{screen.name()}: High DPI display")
     else:
@@ -114,10 +114,10 @@ for screen in QApplication.screens():
 def move_window_to_screen(window, target_screen):
     """Move window to specific screen with proper DPI handling"""
     geometry = target_screen.availableGeometry()
-    
+
     # Position window on target screen
     window.move(geometry.x() + 50, geometry.y() + 50)
-    
+
     # Optional: Resize based on screen DPI
     dpr = target_screen.devicePixelRatio()
     if dpr != window.screen().devicePixelRatio():
@@ -136,14 +136,14 @@ from PyQt6.QtCore import Qt
 def main():
     # Set attributes BEFORE creating QApplication
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    
+
     app = QApplication(sys.argv)
-    
+
     # Set rounding policy for consistent scaling
     app.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
-    
+
     # Your application code here
     return app.exec()
 ```
@@ -181,13 +181,13 @@ def get_scaled_size(base_size, screen):
 # For OpenGL or custom painting, manually handle DPI:
 def paintEvent(self, event):
     painter = QPainter(self)
-    
+
     # Get device pixel ratio
     dpr = self.devicePixelRatio()
-    
+
     # Scale drawing operations
     painter.scale(dpr, dpr)
-    
+
     # Your drawing code here
 ```
 
@@ -245,19 +245,19 @@ export QT_FONT_DPI=144
 def analyze_dpi_setup():
     """Analyze current DPI configuration"""
     screens = QApplication.screens()
-    
+
     print(f"Total screens: {len(screens)}")
-    
+
     for i, screen in enumerate(screens):
         dpr = screen.devicePixelRatio()
         logical_dpi = screen.logicalDotsPerInch()
         physical_dpi = screen.physicalDotsPerInch()
-        
+
         print(f"Screen {i}: {screen.name()}")
         print(f"  DPR: {dpr:.2f}")
         print(f"  Logical DPI: {logical_dpi:.1f}")
         print(f"  Physical DPI: {physical_dpi:.1f}")
-        
+
         if dpr > 1.5:
             print(f"  → High DPI display")
         elif dpr > 1.0:
