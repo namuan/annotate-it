@@ -422,3 +422,14 @@ class MonitorSelectionDialog(QDialog):
 
         # Update OK button text
         self.ok_button.setText(f"Use Monitor {monitor_index + 1}")
+
+    def get_selected_screen(self):
+        """Return the selected screen object."""
+        app = QApplication.instance()
+        screens = app.screens()
+
+        if 0 <= self.selected_monitor_index < len(screens):
+            return screens[self.selected_monitor_index]
+
+        # Fallback to primary screen if index is invalid
+        return app.primaryScreen()
