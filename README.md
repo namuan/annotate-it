@@ -5,7 +5,11 @@
 
 ![](assets/demo.gif)
 
-Supported annotations
+## Multiple Monitor Support
+
+Annotate-It now supports multiple monitor setups! When you have more than one monitor connected, the application will automatically detect all available displays and show a monitor selection dialog at startup.
+
+## Supported annotations
 
 * **Line**: Draw straight lines on the screen.
 * **Arrow**: Draw arrows with customizable direction and color.
