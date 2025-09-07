@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import platform
 import sys
@@ -35,11 +36,11 @@ from PyQt6.QtWidgets import (
 
 # Optional macOS frameworks imported defensively
 try:
-    import objc  # type: ignore
-    import Quartz  # type: ignore
+    import objc  # type: ignore[import]
+    import Quartz  # type: ignore[import]
 except Exception:
-    Quartz = None  # type: ignore
-    objc = None  # type: ignore
+    Quartz = None  # type: ignore[attr-defined]
+    objc = None  # type: ignore[attr-defined]
 
 # Platform flags computed after all imports
 IS_MAC = platform.system() == "Darwin"
@@ -70,7 +71,7 @@ class ConfigManager:
         """Load configuration from file if it exists, otherwise return empty dict."""
         if self.config_file.exists():
             try:
-                with open(self.config_file) as f:
+                with self.config_file.open() as f:
                     return json.load(f)
             except (json.JSONDecodeError, OSError) as e:
                 print(f"Error loading config: {e}")
@@ -80,7 +81,7 @@ class ConfigManager:
     def save_config(self, config):
         """Save configuration to file."""
         try:
-            with open(self.config_file, "w") as f:
+            with self.config_file.open("w") as f:
                 json.dump(config, f, indent=2)
         except OSError as e:
             print(f"Error saving config: {e}")
@@ -537,9 +538,8 @@ class TransparentWindow(QWidget):
                     self._screen_perm_prompted = True
                 return False
             return True
-        except Exception:
-            # If check/request fails for any reason, proceed; TCC will block capture and our lens hint will appear.
-            return False
+        except Exception as e:
+            logging.debug("Error getting window number: %s", e)
 
     def _get_cg_window_id(self):
         """Get the CGWindowID (windowNumber) for this widget's NSWindow (macOS)."""
@@ -550,8 +550,8 @@ class TransparentWindow(QWidget):
             nswindow = nsview.window()
             if nswindow is not None:
                 return int(nswindow.windowNumber())
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug("Error getting window number: %s", e)
         try:
             # Second attempt: from windowHandle().winId() (NSView*)
             wh = self.windowHandle()
@@ -561,8 +561,8 @@ class TransparentWindow(QWidget):
                 nswindow2 = nsview2.window()
                 if nswindow2 is not None:
                     return int(nswindow2.windowNumber())
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug("Error getting window number: %s", e)
         # Warn once to help user diagnose missing ID (and likely permissions)
         if not getattr(self, "_magnifier_id_warned", False):
             print("Magnifier: unable to obtain NSWindow.windowNumber; lens will show hint only.")
