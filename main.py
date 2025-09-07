@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Third-party Qt imports
-from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QCursor,
@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -105,6 +106,525 @@ class QColorButton(QPushButton):
             self.update()
 
 
+class FloatingMenu(QWidget):
+    """Floating menu widget that displays annotation tools and effects."""
+
+    def __init__(self, parent=None):
+        """Initialize the floating menu.
+
+        Args:
+            parent: Parent widget (TransparentWindow instance)
+        """
+        super().__init__()
+        self.parent_window = parent
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Initializing FloatingMenu")
+
+        # Menu state
+        self.is_visible = False
+        self.auto_hide_enabled = True  # Auto-hide after tool/effect selection
+
+        # Animation setup
+        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation.setDuration(300)  # 300ms animation
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        # Auto-hide timer
+        self.auto_hide_timer = QTimer(self)
+        self.auto_hide_timer.setSingleShot(True)
+        self.auto_hide_timer.timeout.connect(self.hide_menu)
+        self.auto_hide_delay = 1500  # 1.5 seconds delay
+
+        # Initialize UI
+        self.init_ui()
+        self.logger.info("FloatingMenu initialized successfully")
+
+    def init_ui(self):
+        """Initialize the user interface for the floating menu."""
+        self.logger.debug("Setting up FloatingMenu UI")
+
+        # Set window properties
+        self.setWindowTitle("AnnotateIt Floating Menu")
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        # Create layout and buttons
+        self.setup_layout()
+        self.create_tool_buttons()
+
+        # Set initial size and position
+        self.resize(400, 60)
+        self.position_menu()
+
+        # Initially hidden
+        self.hide()
+
+        self.logger.debug("FloatingMenu UI setup complete")
+
+    def setup_layout(self):
+        """Set up the layout for the floating menu."""
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+        self.main_layout.setSpacing(5)
+
+        # Store button references for state management
+        self.tool_buttons = {}
+
+        self.logger.debug("Layout setup complete")
+
+    def create_tool_buttons(self):
+        """Create buttons for drawing tools and visual effects."""
+        self.logger.debug("Creating tool and effect buttons")
+
+        # Define drawing tools with their properties
+        tools = [
+            {"name": "line", "text": "L", "tooltip": "Line Tool (L)", "shortcut": "L", "type": "tool"},
+            {"name": "arrow", "text": "A", "tooltip": "Arrow Tool (A)", "shortcut": "A", "type": "tool"},
+            {"name": "rectangle", "text": "R", "tooltip": "Rectangle Tool (R)", "shortcut": "R", "type": "tool"},
+            {"name": "ellipse", "text": "E", "tooltip": "Ellipse Tool (E)", "shortcut": "E", "type": "tool"},
+            {"name": "text", "text": "T", "tooltip": "Text Tool (T)", "shortcut": "T", "type": "tool"},
+        ]
+
+        # Define visual effects with their properties
+        effects = [
+            {"name": "halo", "text": "H", "tooltip": "Halo Effect (H)", "shortcut": "H", "type": "effect"},
+            {
+                "name": "flashlight",
+                "text": "F",
+                "tooltip": "Flashlight Effect (Shift+F)",
+                "shortcut": "Shift+F",
+                "type": "effect",
+            },
+            {"name": "mouse_mask", "text": "M", "tooltip": "Mouse Mask Effect (M)", "shortcut": "M", "type": "effect"},
+            {"name": "magnifier", "text": "Z", "tooltip": "Magnifier Effect (Z)", "shortcut": "Z", "type": "effect"},
+        ]
+
+        # Store effect buttons separately for state management
+        self.effect_buttons = {}
+
+        # Create tool buttons
+        for tool in tools:
+            button = self.create_tool_button(tool)
+            self.tool_buttons[tool["name"]] = button
+            self.main_layout.addWidget(button)
+
+        # Add separator
+        self.add_separator()
+
+        # Create effect buttons
+        for effect in effects:
+            button = self.create_effect_button(effect)
+            self.effect_buttons[effect["name"]] = button
+            self.main_layout.addWidget(button)
+
+        # Add another separator
+        self.add_separator()
+
+        # Define utility functions with their properties
+        utilities = [
+            {"name": "fill_toggle", "text": "F", "tooltip": "Toggle Fill (F)", "shortcut": "F", "type": "utility"},
+            {"name": "opacity", "text": "O", "tooltip": "Cycle Opacity (O)", "shortcut": "O", "type": "utility"},
+            {"name": "clear", "text": "C", "tooltip": "Clear All (C)", "shortcut": "C", "type": "utility"},
+            {"name": "export", "text": "X", "tooltip": "Export to Clipboard (X)", "shortcut": "X", "type": "utility"},
+            {
+                "name": "config",
+                "text": "⚙",
+                "tooltip": "Configuration (Ctrl+,)",
+                "shortcut": "Ctrl+,",
+                "type": "utility",
+            },
+        ]
+
+        # Store utility buttons separately for state management
+        self.utility_buttons = {}
+
+        # Create utility buttons
+        for utility in utilities:
+            button = self.create_utility_button(utility)
+            self.utility_buttons[utility["name"]] = button
+            self.main_layout.addWidget(button)
+
+        self.logger.debug("Tool, effect, and utility buttons created successfully")
+
+    def create_tool_button(self, tool_config):
+        """Create a single tool button.
+
+        Args:
+            tool_config: Dictionary containing tool configuration
+
+        Returns:
+            QToolButton: Configured tool button
+        """
+        button = QToolButton()
+        button.setText(tool_config["text"])
+        button.setToolTip(tool_config["tooltip"])
+        button.setFixedSize(40, 40)
+
+        # Set button style
+        button.setStyleSheet("""
+            QToolButton {
+                background-color: rgba(255, 255, 255, 30);
+                border: 2px solid rgba(255, 255, 255, 100);
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QToolButton:hover {
+                background-color: rgba(255, 255, 255, 50);
+                border-color: rgba(255, 255, 255, 150);
+            }
+            QToolButton:pressed {
+                background-color: rgba(255, 255, 255, 70);
+            }
+            QToolButton:checked {
+                background-color: rgba(0, 150, 255, 100);
+                border-color: rgba(0, 150, 255, 200);
+            }
+        """)
+
+        # Make button checkable for active state indication
+        button.setCheckable(True)
+
+        # Connect button click to tool selection
+        tool_name = tool_config["name"]
+        button.clicked.connect(lambda checked, name=tool_name: self.select_tool(name))
+
+        return button
+
+    def add_separator(self):
+        """Add a visual separator between tool and effect buttons."""
+        separator = QLabel("|")
+        separator.setStyleSheet("""
+            QLabel {
+                color: rgba(255, 255, 255, 150);
+                font-size: 16px;
+                font-weight: bold;
+                padding: 0 5px;
+            }
+        """)
+        separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.main_layout.addWidget(separator)
+
+    def create_effect_button(self, effect_config):
+        """Create a single effect button.
+
+        Args:
+            effect_config: Dictionary containing effect configuration
+
+        Returns:
+            QToolButton: Configured effect button
+        """
+        button = QToolButton()
+        button.setText(effect_config["text"])
+        button.setToolTip(effect_config["tooltip"])
+        button.setFixedSize(40, 40)
+
+        # Set button style (different color scheme for effects)
+        button.setStyleSheet("""
+            QToolButton {
+                background-color: rgba(255, 255, 255, 30);
+                border: 2px solid rgba(255, 255, 255, 100);
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QToolButton:hover {
+                background-color: rgba(255, 255, 255, 50);
+                border-color: rgba(255, 255, 255, 150);
+            }
+            QToolButton:pressed {
+                background-color: rgba(255, 255, 255, 70);
+            }
+            QToolButton:checked {
+                background-color: rgba(255, 165, 0, 100);
+                border-color: rgba(255, 165, 0, 200);
+            }
+        """)
+
+        # Make button checkable for active state indication
+        button.setCheckable(True)
+
+        # Connect button click to effect toggle
+        effect_name = effect_config["name"]
+        button.clicked.connect(lambda checked, name=effect_name: self.toggle_effect(name))
+
+        return button
+
+    def toggle_effect(self, effect_name):
+        """Handle effect toggle from button click.
+
+        Args:
+            effect_name: Name of the effect to toggle
+        """
+        self.logger.info("Effect toggled from floating menu: %s", effect_name)
+
+        # Map effect names to parent window methods
+        effect_methods = {
+            "halo": "toggle_halo",
+            "flashlight": "toggle_flashlight",
+            "mouse_mask": "toggle_mouse_mask",
+            "magnifier": "toggle_magnifier",
+        }
+
+        # Call the appropriate method on parent window
+        if self.parent_window and effect_name in effect_methods:
+            method_name = effect_methods[effect_name]
+            if hasattr(self.parent_window, method_name):
+                getattr(self.parent_window, method_name)()
+
+                # Update button state based on parent window state
+                self.update_effect_state(effect_name)
+
+        # Trigger auto-hide after effect toggle
+        self._trigger_auto_hide()
+
+    def update_effect_state(self, effect_name):
+        """Update effect button state based on parent window state.
+
+        Args:
+            effect_name: Name of the effect to update
+        """
+        if not self.parent_window or effect_name not in self.effect_buttons:
+            return
+
+        # Map effect names to parent window state attributes
+        state_attributes = {
+            "halo": "show_halo",
+            "flashlight": "show_flashlight",
+            "mouse_mask": "show_mouse_mask",
+            "magnifier": "show_magnifier",
+        }
+
+        if effect_name in state_attributes:
+            attr_name = state_attributes[effect_name]
+            if hasattr(self.parent_window, attr_name):
+                is_active = getattr(self.parent_window, attr_name)
+                self.effect_buttons[effect_name].setChecked(is_active)
+
+    def update_all_effect_states(self):
+        """Update all effect button states based on parent window state."""
+        for effect_name in self.effect_buttons:
+            self.update_effect_state(effect_name)
+
+    def create_utility_button(self, utility_config):
+        """Create a single utility button.
+
+        Args:
+            utility_config: Dictionary containing utility configuration
+
+        Returns:
+            QToolButton: Configured utility button
+        """
+        button = QToolButton()
+        button.setText(utility_config["text"])
+        button.setToolTip(utility_config["tooltip"])
+        button.setFixedSize(40, 40)
+
+        # Set button style (different color scheme for utilities)
+        button.setStyleSheet("""
+            QToolButton {
+                background-color: rgba(255, 255, 255, 30);
+                border: 2px solid rgba(255, 255, 255, 100);
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QToolButton:hover {
+                background-color: rgba(255, 255, 255, 50);
+                border-color: rgba(255, 255, 255, 150);
+            }
+            QToolButton:pressed {
+                background-color: rgba(255, 255, 255, 70);
+            }
+            QToolButton:checked {
+                background-color: rgba(128, 255, 128, 100);
+                border-color: rgba(128, 255, 128, 200);
+            }
+        """)
+
+        # Some utility buttons are checkable (like fill toggle)
+        if utility_config["name"] == "fill_toggle":
+            button.setCheckable(True)
+
+        # Connect button click to utility action
+        utility_name = utility_config["name"]
+        button.clicked.connect(lambda checked, name=utility_name: self.execute_utility(name))
+
+        return button
+
+    def execute_utility(self, utility_name):
+        """Handle utility action from button click.
+
+        Args:
+            utility_name: Name of the utility to execute
+        """
+        self.logger.info("Utility executed from floating menu: %s", utility_name)
+
+        # Map utility names to parent window methods
+        utility_methods = {
+            "fill_toggle": "toggle_filled_shapes",
+            "opacity": "cycle_opacity",
+            "clear": "clear_drawings",
+            "export": "export_to_image",
+            "config": "show_config_dialog",
+        }
+
+        # Call the appropriate method on parent window
+        if self.parent_window and utility_name in utility_methods:
+            method_name = utility_methods[utility_name]
+            if hasattr(self.parent_window, method_name):
+                getattr(self.parent_window, method_name)()
+
+                # Update button state for toggleable utilities
+                if utility_name == "fill_toggle":
+                    self.update_utility_state(utility_name)
+
+        # Trigger auto-hide after utility execution (except for config)
+        if utility_name != "config":
+            self._trigger_auto_hide()
+
+    def update_utility_state(self, utility_name):
+        """Update utility button state based on parent window state.
+
+        Args:
+            utility_name: Name of the utility to update
+        """
+        if not self.parent_window or utility_name not in self.utility_buttons:
+            return
+
+        # Only fill_toggle has a persistent state
+        if utility_name == "fill_toggle" and hasattr(self.parent_window, "filled_shapes"):
+            is_active = self.parent_window.filled_shapes
+            self.utility_buttons[utility_name].setChecked(is_active)
+
+    def update_all_utility_states(self):
+        """Update all utility button states based on parent window state."""
+        for utility_name in self.utility_buttons:
+            self.update_utility_state(utility_name)
+
+    def _trigger_auto_hide(self):
+        """Trigger auto-hide timer if enabled and menu is visible."""
+        if self.auto_hide_enabled and self.is_visible:
+            self.auto_hide_timer.start(self.auto_hide_delay)
+            self.logger.debug("Auto-hide timer started")
+
+    def select_tool(self, tool_name):
+        """Handle tool selection from button click.
+
+        Args:
+            tool_name: Name of the selected tool
+        """
+        self.logger.info("Tool selected from floating menu: %s", tool_name)
+
+        # Update button states
+        for name, button in self.tool_buttons.items():
+            button.setChecked(name == tool_name)
+
+        # Notify parent window of tool change
+        if self.parent_window:
+            self.parent_window.set_shape(tool_name)
+
+        # Trigger auto-hide after tool selection
+        self._trigger_auto_hide()
+
+    def update_active_tool(self, tool_name):
+        """Update the active tool indicator.
+
+        Args:
+            tool_name: Name of the currently active tool
+        """
+        self.logger.debug("Updating active tool indicator: %s", tool_name)
+
+        for name, button in self.tool_buttons.items():
+            button.setChecked(name == tool_name)
+
+    def position_menu(self):
+        """Position the menu at the top center of the screen."""
+        if self.parent_window and self.parent_window.target_screen:
+            screen = self.parent_window.target_screen
+        else:
+            screen = QApplication.primaryScreen()
+
+        if screen:
+            screen_geometry = screen.geometry()
+            menu_width = self.width()
+
+            # Position at top center
+            x = screen_geometry.x() + (screen_geometry.width() - menu_width) // 2
+            y = screen_geometry.y() + 20  # 20px from top
+
+            self.move(x, y)
+            self.logger.debug("Positioned FloatingMenu at (%s, %s)", x, y)
+
+    def toggle_visibility(self):
+        """Toggle the visibility of the floating menu."""
+        if self.is_visible:
+            self.hide_menu()
+        else:
+            self.show_menu()
+
+    def show_menu(self):
+        """Show the floating menu with smooth fade-in animation."""
+        if self.is_visible:
+            return
+
+        # Cancel any pending auto-hide
+        self.auto_hide_timer.stop()
+
+        self.position_menu()  # Ensure correct position
+        self.setWindowOpacity(0.0)  # Start invisible
+        self.show()
+
+        # Animate fade-in
+        self.fade_animation.setStartValue(0.0)
+        self.fade_animation.setEndValue(1.0)
+        self.fade_animation.start()
+
+        self.is_visible = True
+        self.logger.info("FloatingMenu shown with animation")
+
+    def hide_menu(self):
+        """Hide the floating menu with smooth fade-out animation."""
+        if not self.is_visible:
+            return
+
+        # Animate fade-out
+        self.fade_animation.setStartValue(1.0)
+        self.fade_animation.setEndValue(0.0)
+
+        # Connect to hide the widget when animation finishes
+        self.fade_animation.finished.connect(self._on_hide_animation_finished)
+        self.fade_animation.start()
+
+        self.is_visible = False
+        self.logger.info("FloatingMenu hidden with animation")
+
+    def _on_hide_animation_finished(self):
+        """Called when hide animation finishes to actually hide the widget."""
+        self.hide()
+        # Disconnect to avoid multiple connections
+        self.fade_animation.finished.disconnect(self._on_hide_animation_finished)
+
+    def paintEvent(self, event):
+        """Custom paint event for semi-transparent background with rounded corners."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Semi-transparent background
+        background_color = QColor(0, 0, 0, 180)  # Black with 70% opacity
+        painter.setBrush(background_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        # Draw rounded rectangle
+        rect = self.rect()
+        painter.drawRoundedRect(rect, 15, 15)
+
+        super().paintEvent(event)
+
+
 class TransparentWindow(QWidget):
     """Main transparent window for drawing annotations on screen."""
 
@@ -158,6 +678,13 @@ class TransparentWindow(QWidget):
         self.cursor_timer.timeout.connect(self.blink_cursor)
         self.cursor_timer.start(500)
 
+        # Initialize floating menu (conditionally based on config)
+        self.floating_menu = None
+        if self.floating_menu_enabled:
+            self.floating_menu = FloatingMenu(self)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("TransparentWindow initialized with floating menu: %s", self.floating_menu_enabled)
+
     def blink_cursor(self):
         """Toggle cursor visibility for text input."""
         if self.is_typing:
@@ -165,7 +692,7 @@ class TransparentWindow(QWidget):
             self.update()
 
     def load_config(self):
-        """Load colors and shape from config."""
+        """Load colors, shape, and settings from config."""
         config = self.config_manager.load_config()
         self.shape = config.get("shape", "arrow")
         self.arrowColor = QColor(config.get("arrowColor", "#00FF00"))
@@ -173,9 +700,10 @@ class TransparentWindow(QWidget):
         self.ellipseColor = QColor(config.get("ellipseColor", "#00BFFF"))
         self.textColor = QColor(config.get("textColor", "#AA26FF"))
         self.lineColor = QColor(config.get("lineColor", "#FFFF00"))
+        self.floating_menu_enabled = config.get("floating_menu_enabled", True)
 
     def save_config(self):
-        """Save current colors and shape to config."""
+        """Save current colors, shape, and settings to config."""
         config = {
             "shape": self.shape,
             "arrowColor": self.arrowColor.name(),
@@ -183,6 +711,7 @@ class TransparentWindow(QWidget):
             "ellipseColor": self.ellipseColor.name(),
             "textColor": self.textColor.name(),
             "lineColor": self.lineColor.name(),
+            "floating_menu_enabled": self.floating_menu_enabled,
         }
         self.config_manager.save_config(config)
 
@@ -227,6 +756,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("Shift+F"), self, self.toggle_flashlight),
             QShortcut(QKeySequence("Z"), self, self.toggle_magnifier),
             QShortcut(QKeySequence("Shift+Z"), self, self.cycle_magnifier_size),
+            QShortcut(QKeySequence("Tab"), self, self.toggle_floating_menu),
         ]
 
     def export_to_image(self):
@@ -284,6 +814,10 @@ class TransparentWindow(QWidget):
         self.filled_shapes = not self.filled_shapes
         print(f"Filled shapes {'enabled' if self.filled_shapes else 'disabled'}")
 
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_utility_state("fill_toggle")
+
     def toggle_halo(self):
         """Toggle halo effect around cursor."""
         self.show_halo = not self.show_halo
@@ -291,12 +825,20 @@ class TransparentWindow(QWidget):
         self.update()
         print(f"Halo effect {'enabled' if self.show_halo else 'disabled'}")
 
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_effect_state("halo")
+
     def toggle_mouse_mask(self):
         """Toggle mouse mask effect."""
         self.show_mouse_mask = not self.show_mouse_mask
         self._manage_update_timer()
         self.update()
         print(f"Mouse mask {'enabled' if self.show_mouse_mask else 'disabled'}")
+
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_effect_state("mouse_mask")
 
     def _manage_update_timer(self):
         """Start or stop update timer based on active effects."""
@@ -316,6 +858,37 @@ class TransparentWindow(QWidget):
         self.shape = shape
         self.save_config()
         print(f"Current shape: {self.shape}")
+
+        # Update floating menu active tool indicator
+        if self.floating_menu:
+            self.floating_menu.update_active_tool(shape)
+
+    def toggle_floating_menu(self):
+        """Toggle the visibility of the floating menu."""
+        if self.floating_menu:
+            self.floating_menu.toggle_visibility()
+            self.logger.info("Floating menu toggled")
+        else:
+            self.logger.info("Floating menu is disabled in configuration")
+
+    def toggle_floating_menu_enabled(self):
+        """Toggle the floating menu enabled/disabled setting."""
+        self.floating_menu_enabled = not self.floating_menu_enabled
+
+        if self.floating_menu_enabled:
+            # Create floating menu if it doesn't exist
+            if not self.floating_menu:
+                self.floating_menu = FloatingMenu(self)
+                self.logger.info("Floating menu enabled and created")
+        else:
+            # Hide and destroy floating menu if it exists
+            if self.floating_menu:
+                self.floating_menu.hide_menu()
+                self.floating_menu = None
+                self.logger.info("Floating menu disabled and destroyed")
+
+        self.save_config()
+        print(f"Floating menu {'enabled' if self.floating_menu_enabled else 'disabled'}")
 
     def clear_drawings(self):
         """Clear all drawings."""
@@ -460,6 +1033,10 @@ class TransparentWindow(QWidget):
         self.update()
         print(f"Flashlight {'enabled' if self.show_flashlight else 'disabled'}")
 
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_effect_state("flashlight")
+
     def draw_halo(self, qp):
         """Draw halo effect around cursor."""
         halo_radius = 20
@@ -511,6 +1088,10 @@ class TransparentWindow(QWidget):
         self._manage_update_timer()
         self.update()
         print(f"Magnifier {'enabled' if self.show_magnifier else 'disabled'}")
+
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_effect_state("magnifier")
 
     def cycle_magnifier_size(self):
         """Cycle through different magnifier window sizes (current, 2x bigger, 4x bigger)."""

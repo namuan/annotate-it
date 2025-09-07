@@ -24,6 +24,21 @@ The application also supports the following methods to track or highlight the cu
 * **Mouse Mask Effect**: Applies a semi-transparent overlay across the screen, with a clear circular area around the cursor to highlight it. Toggled with the 'M' key.
 * **Magnifier Effect**: Shows a circular magnified view of the screen content below the cursor with 2x zoom factor and configurable window sizes: current size, 2x bigger, and 4x bigger (macOS only, requires Screen Recording permission). Toggled with the 'Z' key, window size cycled with 'Shift+Z'.
 
+## Floating Menu
+
+Annotate-It features an optional floating menu that provides visual access to all annotation tools and effects. The floating menu:
+
+* **Visual Tool Selection**: Click on tool buttons (L, A, R, E, T) to switch between Line, Arrow, Rectangle, Ellipse, and Text tools
+* **Effect Toggles**: Click on effect buttons (H, F, M, Z) to toggle Halo, Flashlight, Mouse Mask, and Magnifier effects
+* **Utility Functions**: Access Fill toggle (F), Opacity cycling (O), Clear all (C), Export (X), and Configuration (⚙) functions
+* **Visual State Indicators**: Active tools and effects are highlighted with different colors (blue for tools, orange for effects, green for utilities)
+* **Hover Tooltips**: Each button shows the corresponding keyboard shortcut when hovered
+* **Smooth Animations**: Fade-in/fade-out animations for better user experience
+* **Multi-Monitor Support**: Automatically positions on the correct monitor in multi-monitor setups
+* **Configurable**: Can be enabled/disabled through the configuration system
+
+The floating menu appears at the top center of the screen and can be toggled with the `Tab` key. It maintains all existing keyboard shortcuts, so you can use either the floating menu or keyboard shortcuts based on your preference.
+
 ## Usage
 
 The app works with keyboard shortcuts.
@@ -49,6 +64,7 @@ Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to quickly view all shortcuts.
 - `Ctrl+Z`: Undo last action
 - `Ctrl+Y`: Redo last undone action
 - `Ctrl+,`: Open configuration dialog
+- `Tab`: Toggle floating menu visibility
 
 ## Configuration
 
