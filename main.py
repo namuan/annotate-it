@@ -1,35 +1,49 @@
 import json
 import os
 import sys
+import platform
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint
-from PyQt6.QtCore import QPointF
-from PyQt6.QtCore import QRect
-from PyQt6.QtCore import QRectF
-from PyQt6.QtCore import QTimer
-from PyQt6.QtCore import Qt
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtGui import QCursor
-from PyQt6.QtGui import QFont
-from PyQt6.QtGui import QKeySequence
-from PyQt6.QtGui import QPainter
-from PyQt6.QtGui import QPainterPath
-from PyQt6.QtGui import QPen
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtGui import QRadialGradient
-from PyQt6.QtGui import QShortcut
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtWidgets import QColorDialog
-from PyQt6.QtWidgets import QDialog
-from PyQt6.QtWidgets import QFrame
-from PyQt6.QtWidgets import QGridLayout
-from PyQt6.QtWidgets import QHBoxLayout
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtWidgets import QVBoxLayout
-from PyQt6.QtWidgets import QWidget
+# Third-party Qt imports
+from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QColor,
+    QCursor,
+    QFont,
+    QKeySequence,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QImage,
+    QRadialGradient,
+    QShortcut,
+)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QColorDialog,
+    QDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    QMessageBox,
+)
+
+# Optional macOS frameworks imported defensively
+try:
+    import Quartz  # type: ignore
+    import objc  # type: ignore
+except Exception:
+    Quartz = None  # type: ignore
+    objc = None  # type: ignore
+
+# Platform flags computed after all imports
+IS_MAC = platform.system() == "Darwin"
+MAC_NATIVE_CAPTURE_AVAILABLE = bool(Quartz) if IS_MAC else False
 
 
 class ConfigManager:
@@ -124,6 +138,11 @@ class TransparentWindow(QWidget):
         self.show_mouse_mask = False
         self.mouse_mask_radius = 100
         self.mouse_mask_alpha = 128
+        # Magnifier (macOS native) state
+        self.show_magnifier = False
+        self.magnifier_radius = 120
+        self.magnifier_factor = 2.0
+        self._below_snapshot = None  # QPixmap of the content below this window
         self.update_timer.setInterval(16)  # ~60 FPS
         QTimer.singleShot(1000, self.toggle_halo)
 
@@ -205,6 +224,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("Ctrl+Y"), self, self.redo),
             QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
             QShortcut(QKeySequence("Shift+F"), self, self.toggle_flashlight),
+            QShortcut(QKeySequence("Z"), self, self.toggle_magnifier),
         ]
 
     def export_to_image(self):
@@ -280,7 +300,12 @@ class TransparentWindow(QWidget):
 
     def _manage_update_timer(self):
         """Start or stop update timer based on active effects."""
-        if self.show_flashlight or self.show_halo or self.show_mouse_mask:
+        if (
+            self.show_flashlight
+            or self.show_halo
+            or self.show_mouse_mask
+            or self.show_magnifier
+        ):
             self.update_timer.start()
         else:
             self.update_timer.stop()
@@ -335,7 +360,12 @@ class TransparentWindow(QWidget):
 
     def paintEvent(self, event):
         """Handle painting of the window."""
-        if self.show_halo or self.show_flashlight or self.show_mouse_mask:
+        if (
+            self.show_halo
+            or self.show_flashlight
+            or self.show_mouse_mask
+            or self.show_magnifier
+        ):
             self.update_cursor_pos()
 
         qp = QPainter(self)
@@ -358,6 +388,8 @@ class TransparentWindow(QWidget):
             self.draw_flashlight(qp)
         if self.show_mouse_mask:
             self.draw_mouse_mask(qp)
+        if self.show_magnifier:
+            self.draw_magnifier(qp)
 
     def _draw_current_shape(self, qp):
         """Draw the current shape being created."""
@@ -471,6 +503,230 @@ class TransparentWindow(QWidget):
         inner_path.addEllipse(center, radius, radius)
         mask_path = outer_path.subtracted(inner_path)
         qp.fillPath(mask_path, QColor(0, 0, 0, self.mouse_mask_alpha))
+
+    def toggle_magnifier(self):
+        """Toggle macOS-native magnifier (captures below this window)."""
+        if not IS_MAC or not MAC_NATIVE_CAPTURE_AVAILABLE:
+            # Avoid spamming logs repeatedly; show once per toggle attempt.
+            if not getattr(self, "_magnifier_warned", False):
+                print(
+                    "Magnifier is only available on macOS with PyObjC/Quartz installed."
+                )
+                self._magnifier_warned = True
+            return
+        # Determine desired state first
+        desired = not self.show_magnifier
+        # When enabling, proactively request Screen Recording permission on macOS 10.15+
+        if desired:
+            self._macos_request_screen_capture_access()
+        self.show_magnifier = desired
+        if not self.show_magnifier:
+            self._below_snapshot = None
+        self._manage_update_timer()
+        self.update()
+        print(f"Magnifier {'enabled' if self.show_magnifier else 'disabled'}")
+
+    def _macos_request_screen_capture_access(self) -> bool:
+        """Check/request macOS Screen Recording permission. Returns True if available."""
+        if not IS_MAC or not MAC_NATIVE_CAPTURE_AVAILABLE:
+            return False
+        try:
+            preflight_ok = True
+            if hasattr(Quartz, "CGPreflightScreenCaptureAccess"):
+                preflight_ok = bool(Quartz.CGPreflightScreenCaptureAccess())
+            if preflight_ok:
+                return True
+            # Request will show the system permission dialog (only the first time)
+            if hasattr(Quartz, "CGRequestScreenCaptureAccess"):
+                granted = bool(Quartz.CGRequestScreenCaptureAccess())
+            else:
+                granted = False
+            if not granted:
+                if not getattr(self, "_screen_perm_prompted", False):
+                    QMessageBox.information(
+                        self,
+                        "Screen Recording Permission Required",
+                        (
+                            "To display the magnifier content, enable Screen Recording for this app:\n\n"
+                            "System Settings → Privacy & Security → Screen Recording → enable for Annotate It.\n\n"
+                            "After enabling, completely quit and reopen the app for changes to take effect."
+                        ),
+                    )
+                    self._screen_perm_prompted = True
+                return False
+            return True
+        except Exception:
+            # If check/request fails for any reason, proceed; TCC will block capture and our lens hint will appear.
+            return False
+
+    def _get_cg_window_id(self):
+        """Get the CGWindowID (windowNumber) for this widget's NSWindow (macOS)."""
+        try:
+            # First attempt: from QWidget.winId() (NSView*)
+            wid = int(self.winId())
+            nsview = objc.objc_object(c_void_p=wid)
+            nswindow = nsview.window()
+            if nswindow is not None:
+                return int(nswindow.windowNumber())
+        except Exception:
+            pass
+        try:
+            # Second attempt: from windowHandle().winId() (NSView*)
+            wh = self.windowHandle()
+            if wh is not None:
+                wid2 = int(wh.winId())
+                nsview2 = objc.objc_object(c_void_p=wid2)
+                nswindow2 = nsview2.window()
+                if nswindow2 is not None:
+                    return int(nswindow2.windowNumber())
+        except Exception:
+            pass
+        # Warn once to help user diagnose missing ID (and likely permissions)
+        if not getattr(self, "_magnifier_id_warned", False):
+            print(
+                "Magnifier: unable to obtain NSWindow.windowNumber; lens will show hint only."
+            )
+            self._magnifier_id_warned = True
+        return None
+
+    def _update_below_snapshot(self):
+        """Refresh the snapshot of content below this window (macOS)."""
+        if not (IS_MAC and MAC_NATIVE_CAPTURE_AVAILABLE and self.show_magnifier):
+            self._below_snapshot = None
+            return
+        try:
+            window_id = self._get_cg_window_id()
+            if not window_id:
+                self._below_snapshot = None
+                return
+            cgimg = Quartz.CGWindowListCreateImage(
+                Quartz.CGRectInfinite,
+                Quartz.kCGWindowListOptionOnScreenBelowWindow,
+                window_id,
+                Quartz.kCGWindowImageDefault,
+            )
+            if not cgimg:
+                self._below_snapshot = None
+                return
+            width = Quartz.CGImageGetWidth(cgimg)
+            height = Quartz.CGImageGetHeight(cgimg)
+            bytes_per_row = Quartz.CGImageGetBytesPerRow(cgimg)
+            data_provider = Quartz.CGImageGetDataProvider(cgimg)
+            data = Quartz.CGDataProviderCopyData(data_provider)
+            buf = bytes(data)
+            qimg = QImage(
+                buf,
+                width,
+                height,
+                bytes_per_row,
+                QImage.Format.Format_ARGB32_Premultiplied,
+            )
+            qimg = qimg.copy()  # Detach from buffer
+            full = QPixmap.fromImage(qimg)
+
+            # Account for HiDPI: crop using pixel coordinates
+            dpr = (
+                float(self.devicePixelRatioF())
+                if hasattr(self, "devicePixelRatioF")
+                else 1.0
+            )
+            self._below_dpr = dpr
+
+            geom = self.frameGeometry()  # logical coords
+            x_px = int(max(0, min(round(geom.x() * dpr), full.width() - 1)))
+            y_px = int(max(0, min(round(geom.y() * dpr), full.height() - 1)))
+            w_px = int(max(1, min(round(geom.width() * dpr), full.width() - x_px)))
+            h_px = int(max(1, min(round(geom.height() * dpr), full.height() - y_px)))
+
+            self._below_snapshot = full.copy(QRect(x_px, y_px, w_px, h_px))
+        except Exception:
+            # If anything fails, disable snapshot for this frame; lens will show hint.
+            self._below_snapshot = None
+
+    def draw_magnifier(self, qp):
+        """Draw a circular magnifier showing content below this window, in real time."""
+        # Update background snapshot (below this window)
+        self._update_below_snapshot()
+
+        center = self.cursor_pos  # logical coords
+        radius = self.magnifier_radius
+        factor = self.magnifier_factor
+
+        # Always draw the lens outline so user can see the magnifier is active
+        qp.save()
+        path = QPainterPath()
+        path.addEllipse(QPointF(center), radius, radius)
+        qp.setClipPath(path)
+
+        if self._below_snapshot is not None:
+            # HiDPI-aware source selection
+            dpr = getattr(self, "_below_dpr", 1.0)
+            center_px = QPoint(
+                int(round(center.x() * dpr)), int(round(center.y() * dpr))
+            )
+            src_size_px = max(1, int(round((2 * radius * dpr) / max(0.01, factor))))
+            src_rect = QRect(
+                center_px.x() - src_size_px // 2,
+                center_px.y() - src_size_px // 2,
+                src_size_px,
+                src_size_px,
+            )
+            src_rect = src_rect.intersected(
+                QRect(0, 0, self._below_snapshot.width(), self._below_snapshot.height())
+            )
+            if not src_rect.isEmpty():
+                dst_rect = QRect(
+                    center.x() - radius, center.y() - radius, 2 * radius, 2 * radius
+                )
+                qp.drawPixmap(dst_rect, self._below_snapshot, src_rect)
+                # Optionally overlay annotations magnified as well
+                logical_src_w = max(
+                    1, int(round(src_rect.width() / max(0.01, dpr * factor)))
+                )
+                logical_src_h = max(
+                    1, int(round(src_rect.height() / max(0.01, dpr * factor)))
+                )
+                ann_src = QRect(
+                    center.x() - logical_src_w // 2,
+                    center.y() - logical_src_h // 2,
+                    logical_src_w,
+                    logical_src_h,
+                )
+                qp.drawPixmap(dst_rect, self.drawingLayer, ann_src)
+        else:
+            # Snapshot unavailable: fill lens with a subtle hint background and text
+            qp.fillRect(
+                QRect(center.x() - radius, center.y() - radius, 2 * radius, 2 * radius),
+                QColor(0, 0, 0, 120),
+            )
+            qp.setClipping(False)
+            qp.setPen(QPen(QColor(255, 255, 255, 230)))
+            qp.setFont(QFont(self.default_font_family, 12))
+            hint = "Enable Screen Recording in Settings"
+            qp.drawText(
+                QRect(center.x() - radius, center.y() - 10, 2 * radius, 20),
+                Qt.AlignmentFlag.AlignCenter,
+                hint,
+            )
+            qp.setClipPath(path)  # restore clip for outline
+
+        # Draw lens outline on top with thin double border
+        qp.setClipping(False)
+        qp.setBrush(Qt.BrushStyle.NoBrush)
+
+        # Outer border (dark)
+        outer_pen = QPen(QColor(0, 0, 0, 180))
+        outer_pen.setWidth(2)
+        qp.setPen(outer_pen)
+        qp.drawEllipse(QPointF(center), radius, radius)
+
+        # Inner border (light)
+        inner_pen = QPen(QColor(255, 255, 255, 200))
+        inner_pen.setWidth(1)
+        qp.setPen(inner_pen)
+        qp.drawEllipse(QPointF(center), radius - 1, radius - 1)
+
+        qp.restore()
 
     def focusOutEvent(self, event):
         """Handle focus loss during text input."""
@@ -694,6 +950,8 @@ class ConfigDialog(QDialog):
             ("Ctrl+Y", "Redo"),
             ("Ctrl+,", "Show This Dialog"),
             ("M", "Toggle Mouse Mask"),
+            ("Shift+F", "Toggle Flashlight Effect"),
+            ("Z", "Toggle Magnifier (macOS only)"),
         ]
 
         for i, (key, description) in enumerate(shortcuts):
@@ -1170,3 +1428,5 @@ if __name__ == "__main__":
     ex = TransparentWindow(target_screen)
     ex.show()
     sys.exit(app.exec())
+
+    MAC_NATIVE_CAPTURE_AVAILABLE = False

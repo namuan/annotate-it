@@ -11,11 +11,11 @@ deps: ## Install dependencies
 	$(PY) -m pip install --upgrade -r requirements-dev.txt
 	$(PY) -m pip install --upgrade pip
 
-pre-commit: ## Manually run all precommit hooks
+check: ## Manually run all precommit hooks
 	./venv/bin/pre-commit install
 	./venv/bin/pre-commit run --all-files
 
-pre-commit-tool: ## Manually run a single pre-commit hook
+check-tool: ## Manually run a single pre-commit hook
 	./venv/bin/pre-commit run $(TOOL) --all-files
 
 clean: ## Clean package
@@ -25,7 +25,7 @@ clean: ## Clean package
 run: ## Runs the application
 	./venv/bin/python3 main.py
 
-package: clean pre-commit ## Run installer
+package: clean check ## Run installer
 	./venv/bin/pyinstaller main.spec
 
 install-macosx: package ## Installs application in users Application folder
