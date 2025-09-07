@@ -35,12 +35,8 @@ def list_all_monitors():
         # Geometry information
         geometry = screen.geometry()
         available = screen.availableGeometry()
-        print(
-            f"  Full Geometry: {geometry.width()}x{geometry.height()} at ({geometry.x()}, {geometry.y()})"
-        )
-        print(
-            f"  Available Area: {available.width()}x{available.height()} at ({available.x()}, {available.y()})"
-        )
+        print(f"  Full Geometry: {geometry.width()}x{geometry.height()} at ({geometry.x()}, {geometry.y()})")
+        print(f"  Available Area: {available.width()}x{available.height()} at ({available.x()}, {available.y()})")
 
         # DPI and scaling information
         dpr = screen.devicePixelRatio()

@@ -7,12 +7,7 @@ Demonstrates how coordinates work across different monitor arrangements
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtWidgets import QTextEdit
-from PyQt6.QtWidgets import QVBoxLayout
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 
 class CoordinateSystemTest(QWidget):
@@ -59,9 +54,7 @@ class CoordinateSystemTest(QWidget):
 
         # Basic screen information
         analysis += f"Total screens detected: {len(screens)}\n"
-        analysis += (
-            f"Primary screen: {primary_screen.name() if primary_screen else 'None'}\n\n"
-        )
+        analysis += f"Primary screen: {primary_screen.name() if primary_screen else 'None'}\n\n"
 
         # Virtual desktop information
         if screens:
@@ -96,29 +89,23 @@ class CoordinateSystemTest(QWidget):
             elif geometry.x() > 0:
                 analysis += "    - POSITIVE X coordinate: Screen is positioned RIGHT of primary\n"
             else:
-                analysis += (
-                    "    - ZERO X coordinate: Screen aligns with primary horizontally\n"
-                )
+                analysis += "    - ZERO X coordinate: Screen aligns with primary horizontally\n"
 
             if geometry.y() < 0:
-                analysis += (
-                    "    - NEGATIVE Y coordinate: Screen is positioned ABOVE primary\n"
-                )
+                analysis += "    - NEGATIVE Y coordinate: Screen is positioned ABOVE primary\n"
             elif geometry.y() > 0:
-                analysis += (
-                    "    - POSITIVE Y coordinate: Screen is positioned BELOW primary\n"
-                )
+                analysis += "    - POSITIVE Y coordinate: Screen is positioned BELOW primary\n"
             else:
-                analysis += (
-                    "    - ZERO Y coordinate: Screen aligns with primary vertically\n"
-                )
+                analysis += "    - ZERO Y coordinate: Screen aligns with primary vertically\n"
 
             # Corner coordinates
             analysis += "  Corner Coordinates:\n"
             analysis += f"    - Top-Left: ({geometry.x()}, {geometry.y()})\n"
             analysis += f"    - Top-Right: ({geometry.x() + geometry.width() - 1}, {geometry.y()})\n"
             analysis += f"    - Bottom-Left: ({geometry.x()}, {geometry.y() + geometry.height() - 1})\n"
-            analysis += f"    - Bottom-Right: ({geometry.x() + geometry.width() - 1}, {geometry.y() + geometry.height() - 1})\n"
+            analysis += (
+                f"    - Bottom-Right: ({geometry.x() + geometry.width() - 1}, {geometry.y() + geometry.height() - 1})\n"
+            )
 
             # Virtual siblings
             virtual_siblings = screen.virtualSiblings()
@@ -132,9 +119,7 @@ class CoordinateSystemTest(QWidget):
         analysis += "Key Points About Multi-Monitor Coordinates:\n"
         analysis += "1. PRIMARY SCREEN: Always has (0,0) at its top-left corner\n"
         analysis += "2. SECONDARY SCREENS: Can have negative or positive coordinates\n"
-        analysis += (
-            "3. NEGATIVE COORDINATES: Indicate screens positioned left/above primary\n"
-        )
+        analysis += "3. NEGATIVE COORDINATES: Indicate screens positioned left/above primary\n"
         analysis += "4. COORDINATE ORIGIN: Always (0,0) at primary screen's top-left\n"
         analysis += "5. VIRTUAL DESKTOP: Bounding box containing all screens\n\n"
 
@@ -164,9 +149,7 @@ class CoordinateSystemTest(QWidget):
 
         if len(screens) < 2:
             self.analysis_text.append("\n=== POSITIONING TEST ===\n")
-            self.analysis_text.append(
-                "Only one screen detected. Cannot test multi-screen positioning.\n"
-            )
+            self.analysis_text.append("Only one screen detected. Cannot test multi-screen positioning.\n")
             return
 
         self.analysis_text.append("\n=== POSITIONING TEST ===\n")
@@ -181,9 +164,7 @@ class CoordinateSystemTest(QWidget):
 
             self.analysis_text.append(f"Screen {i + 1} ({screen.name()}):")
             self.analysis_text.append(f"  Available Geometry: {geometry}")
-            self.analysis_text.append(
-                f"  Calculated Center Position: ({center_x}, {center_y})"
-            )
+            self.analysis_text.append(f"  Calculated Center Position: ({center_x}, {center_y})")
 
             # Validate coordinates
             if (
@@ -215,9 +196,7 @@ class CoordinateSystemTest(QWidget):
 
         self.move(new_x, new_y)
 
-        self.analysis_text.append(
-            f"Window moved to Screen {next_screen_index + 1} ({target_screen.name()})"
-        )
+        self.analysis_text.append(f"Window moved to Screen {next_screen_index + 1} ({target_screen.name()})")
         self.analysis_text.append(f"New position: ({new_x}, {new_y})")
 
         # Update analysis after move
@@ -243,24 +222,16 @@ def demonstrate_coordinate_calculations():
         print("  Coordinate analysis:")
 
         if geometry.x() < 0:
-            print(
-                f"    - X={geometry.x()}: Screen is {abs(geometry.x())} pixels LEFT of primary"
-            )
+            print(f"    - X={geometry.x()}: Screen is {abs(geometry.x())} pixels LEFT of primary")
         elif geometry.x() > 0:
-            print(
-                f"    - X={geometry.x()}: Screen is {geometry.x()} pixels RIGHT of primary"
-            )
+            print(f"    - X={geometry.x()}: Screen is {geometry.x()} pixels RIGHT of primary")
         else:
             print(f"    - X={geometry.x()}: Screen horizontally aligned with primary")
 
         if geometry.y() < 0:
-            print(
-                f"    - Y={geometry.y()}: Screen is {abs(geometry.y())} pixels ABOVE primary"
-            )
+            print(f"    - Y={geometry.y()}: Screen is {abs(geometry.y())} pixels ABOVE primary")
         elif geometry.y() > 0:
-            print(
-                f"    - Y={geometry.y()}: Screen is {geometry.y()} pixels BELOW primary"
-            )
+            print(f"    - Y={geometry.y()}: Screen is {geometry.y()} pixels BELOW primary")
         else:
             print(f"    - Y={geometry.y()}: Screen vertically aligned with primary")
 

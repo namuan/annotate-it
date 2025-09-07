@@ -8,3 +8,4 @@ dist/
 .aider*
 .env
 __pycache__/
+*.egg-info/

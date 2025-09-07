@@ -1,21 +1,21 @@
 import json
 import os
-import sys
 import platform
+import sys
 from pathlib import Path
 
 # Third-party Qt imports
-from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QCursor,
     QFont,
+    QImage,
     QKeySequence,
     QPainter,
     QPainterPath,
     QPen,
     QPixmap,
-    QImage,
     QRadialGradient,
     QShortcut,
 )
@@ -27,16 +27,16 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
-    QMessageBox,
 )
 
 # Optional macOS frameworks imported defensively
 try:
-    import Quartz  # type: ignore
     import objc  # type: ignore
+    import Quartz  # type: ignore
 except Exception:
     Quartz = None  # type: ignore
     objc = None  # type: ignore
@@ -191,9 +191,7 @@ class TransparentWindow(QWidget):
     def init_ui(self):
         """Initialize UI settings and shortcuts."""
         self.setWindowTitle("Transparent Drawing")
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
-        )
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         # Position window on target screen or maximize on primary screen
@@ -263,9 +261,7 @@ class TransparentWindow(QWidget):
 
     def cycle_opacity(self):
         """Cycle through opacity levels."""
-        self.current_opacity_index = (self.current_opacity_index + 1) % len(
-            self.opacity_levels
-        )
+        self.current_opacity_index = (self.current_opacity_index + 1) % len(self.opacity_levels)
         self.current_opacity = self.opacity_levels[self.current_opacity_index]
         print(f"Opacity set to {int(self.current_opacity / 255 * 100)}%")
 
@@ -300,12 +296,7 @@ class TransparentWindow(QWidget):
 
     def _manage_update_timer(self):
         """Start or stop update timer based on active effects."""
-        if (
-            self.show_flashlight
-            or self.show_halo
-            or self.show_mouse_mask
-            or self.show_magnifier
-        ):
+        if self.show_flashlight or self.show_halo or self.show_mouse_mask or self.show_magnifier:
             self.update_timer.start()
         else:
             self.update_timer.stop()
@@ -360,12 +351,7 @@ class TransparentWindow(QWidget):
 
     def paintEvent(self, event):
         """Handle painting of the window."""
-        if (
-            self.show_halo
-            or self.show_flashlight
-            or self.show_mouse_mask
-            or self.show_magnifier
-        ):
+        if self.show_halo or self.show_flashlight or self.show_mouse_mask or self.show_magnifier:
             self.update_cursor_pos()
 
         qp = QPainter(self)
@@ -485,9 +471,7 @@ class TransparentWindow(QWidget):
                 self.current_opacity,
             ),
         )
-        gradient.setColorAt(
-            1, QColor(shape_color.red(), shape_color.green(), shape_color.blue(), 75)
-        )
+        gradient.setColorAt(1, QColor(shape_color.red(), shape_color.green(), shape_color.blue(), 75))
         qp.setBrush(gradient)
         qp.setPen(Qt.PenStyle.NoPen)
         qp.drawEllipse(cursor_pos_f, halo_radius, halo_radius)
@@ -509,9 +493,7 @@ class TransparentWindow(QWidget):
         if not IS_MAC or not MAC_NATIVE_CAPTURE_AVAILABLE:
             # Avoid spamming logs repeatedly; show once per toggle attempt.
             if not getattr(self, "_magnifier_warned", False):
-                print(
-                    "Magnifier is only available on macOS with PyObjC/Quartz installed."
-                )
+                print("Magnifier is only available on macOS with PyObjC/Quartz installed.")
                 self._magnifier_warned = True
             return
         # Determine desired state first
@@ -583,9 +565,7 @@ class TransparentWindow(QWidget):
             pass
         # Warn once to help user diagnose missing ID (and likely permissions)
         if not getattr(self, "_magnifier_id_warned", False):
-            print(
-                "Magnifier: unable to obtain NSWindow.windowNumber; lens will show hint only."
-            )
+            print("Magnifier: unable to obtain NSWindow.windowNumber; lens will show hint only.")
             self._magnifier_id_warned = True
         return None
 
@@ -625,11 +605,7 @@ class TransparentWindow(QWidget):
             full = QPixmap.fromImage(qimg)
 
             # Account for HiDPI: crop using pixel coordinates
-            dpr = (
-                float(self.devicePixelRatioF())
-                if hasattr(self, "devicePixelRatioF")
-                else 1.0
-            )
+            dpr = float(self.devicePixelRatioF()) if hasattr(self, "devicePixelRatioF") else 1.0
             self._below_dpr = dpr
 
             geom = self.frameGeometry()  # logical coords
@@ -661,9 +637,7 @@ class TransparentWindow(QWidget):
         if self._below_snapshot is not None:
             # HiDPI-aware source selection
             dpr = getattr(self, "_below_dpr", 1.0)
-            center_px = QPoint(
-                int(round(center.x() * dpr)), int(round(center.y() * dpr))
-            )
+            center_px = QPoint(int(round(center.x() * dpr)), int(round(center.y() * dpr)))
             src_size_px = max(1, int(round((2 * radius * dpr) / max(0.01, factor))))
             src_rect = QRect(
                 center_px.x() - src_size_px // 2,
@@ -671,21 +645,13 @@ class TransparentWindow(QWidget):
                 src_size_px,
                 src_size_px,
             )
-            src_rect = src_rect.intersected(
-                QRect(0, 0, self._below_snapshot.width(), self._below_snapshot.height())
-            )
+            src_rect = src_rect.intersected(QRect(0, 0, self._below_snapshot.width(), self._below_snapshot.height()))
             if not src_rect.isEmpty():
-                dst_rect = QRect(
-                    center.x() - radius, center.y() - radius, 2 * radius, 2 * radius
-                )
+                dst_rect = QRect(center.x() - radius, center.y() - radius, 2 * radius, 2 * radius)
                 qp.drawPixmap(dst_rect, self._below_snapshot, src_rect)
                 # Optionally overlay annotations magnified as well
-                logical_src_w = max(
-                    1, int(round(src_rect.width() / max(0.01, dpr * factor)))
-                )
-                logical_src_h = max(
-                    1, int(round(src_rect.height() / max(0.01, dpr * factor)))
-                )
+                logical_src_w = max(1, int(round(src_rect.width() / max(0.01, dpr * factor))))
+                logical_src_h = max(1, int(round(src_rect.height() / max(0.01, dpr * factor))))
                 ann_src = QRect(
                     center.x() - logical_src_w // 2,
                     center.y() - logical_src_h // 2,
@@ -732,14 +698,12 @@ class TransparentWindow(QWidget):
         """Handle focus loss during text input."""
         if self.is_typing and self.current_text:
             self.undoStack.append(self.shapes.copy())
-            self.shapes.append(
-                {
-                    "type": "text",
-                    "position": self.current_text_pos,
-                    "text": self.current_text,
-                    "opacity": self.current_opacity,
-                }
-            )
+            self.shapes.append({
+                "type": "text",
+                "position": self.current_text_pos,
+                "text": self.current_text,
+                "opacity": self.current_opacity,
+            })
             self.redraw_shapes()
             self.redoStack.clear()
             self.current_text = ""
@@ -755,14 +719,12 @@ class TransparentWindow(QWidget):
             if event.key() == Qt.Key.Key_Return:
                 if self.current_text:
                     self.undoStack.append(self.shapes.copy())
-                    self.shapes.append(
-                        {
-                            "type": "text",
-                            "position": self.current_text_pos,
-                            "text": self.current_text,
-                            "opacity": self.current_opacity,
-                        }
-                    )
+                    self.shapes.append({
+                        "type": "text",
+                        "position": self.current_text_pos,
+                        "text": self.current_text,
+                        "opacity": self.current_opacity,
+                    })
                     self.redraw_shapes()
                     self.redoStack.clear()
                 self.current_text = ""
@@ -787,14 +749,12 @@ class TransparentWindow(QWidget):
             if self.shape == "text":
                 if self.is_typing and self.current_text:
                     self.undoStack.append(self.shapes.copy())
-                    self.shapes.append(
-                        {
-                            "type": "text",
-                            "position": self.current_text_pos,
-                            "text": self.current_text,
-                            "opacity": self.current_opacity,
-                        }
-                    )
+                    self.shapes.append({
+                        "type": "text",
+                        "position": self.current_text_pos,
+                        "text": self.current_text,
+                        "opacity": self.current_opacity,
+                    })
                     self.redraw_shapes()
                     self.redoStack.clear()
 
@@ -1214,34 +1174,18 @@ class MonitorSelectionDialog(QDialog):
         # Calculate bounding box
         min_x = min(screen.geometry().x() for screen in screens)
         min_y = min(screen.geometry().y() for screen in screens)
-        max_x = max(
-            screen.geometry().x() + screen.geometry().width() for screen in screens
-        )
-        max_y = max(
-            screen.geometry().y() + screen.geometry().height() for screen in screens
-        )
+        max_x = max(screen.geometry().x() + screen.geometry().width() for screen in screens)
+        max_y = max(screen.geometry().y() + screen.geometry().height() for screen in screens)
 
         total_width = max_x - min_x
         total_height = max_y - min_y
         aspect_ratio = total_width / total_height if total_height > 0 else 1.0
 
         # Determine configuration type
-        config_type = (
-            "horizontal"
-            if aspect_ratio > 2.0
-            else "vertical"
-            if aspect_ratio < 0.5
-            else "mixed"
-        )
+        config_type = "horizontal" if aspect_ratio > 2.0 else "vertical" if aspect_ratio < 0.5 else "mixed"
 
         # Determine complexity
-        complexity = (
-            "simple"
-            if len(screens) <= 2
-            else "moderate"
-            if len(screens) <= 4
-            else "complex"
-        )
+        complexity = "simple" if len(screens) <= 2 else "moderate" if len(screens) <= 4 else "complex"
 
         return {
             "type": config_type,
@@ -1322,9 +1266,7 @@ class MonitorSelectionDialog(QDialog):
 
     def create_monitor_widgets(self, screens, primary_screen, layout_params):
         """Create monitor widgets with responsive positioning."""
-        min_x, min_y, max_x, max_y = self.analyze_monitor_configuration(screens)[
-            "bounds"
-        ]
+        min_x, min_y, max_x, max_y = self.analyze_monitor_configuration(screens)["bounds"]
         scale_factor = layout_params["scale_factor"]
         margin_x = layout_params["margin_x"]
         margin_y = layout_params["margin_y"]
@@ -1409,7 +1351,7 @@ class MonitorSelectionDialog(QDialog):
         return app.primaryScreen()
 
 
-if __name__ == "__main__":
+def main():
     app = QApplication(sys.argv)
 
     # Show monitor selection dialog if multiple monitors are available
@@ -1429,4 +1371,6 @@ if __name__ == "__main__":
     ex.show()
     sys.exit(app.exec())
 
-    MAC_NATIVE_CAPTURE_AVAILABLE = False
+
+if __name__ == "__main__":
+    main()

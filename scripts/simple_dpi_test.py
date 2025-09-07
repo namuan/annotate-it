@@ -7,11 +7,7 @@ Testing what DPI attributes and methods are available in PyQt6
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtWidgets import QMainWindow
-from PyQt6.QtWidgets import QVBoxLayout
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
 
 
 def main():
@@ -21,9 +17,7 @@ def main():
 
     # Check available Qt attributes
     print("\nAvailable Qt attributes:")
-    qt_attrs = [
-        attr for attr in dir(Qt) if "AA_" in attr or "DPI" in attr or "HighDpi" in attr
-    ]
+    qt_attrs = [attr for attr in dir(Qt) if "AA_" in attr or "DPI" in attr or "HighDpi" in attr]
     for attr in qt_attrs:
         print(f"  {attr}")
 

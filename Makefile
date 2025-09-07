@@ -1,45 +1,61 @@
 export PROJECTNAME=$(shell basename "$(PWD)")
-PY=./venv/bin/python3
 
-.SILENT: ;               # no need for @
+.PHONY: $(shell grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk -F: '{print $$1}')
 
-setup: clean ## Re-initiates virtualenv
-	rm -rf venv
-	python3 -m venv venv
+install: ## Install the virtual environment and install the pre-commit hooks
+	@echo "🚀 Creating virtual environment using uv"
+	@uv sync
+	@uv run pre-commit install
 
-deps: ## Install dependencies
-	$(PY) -m pip install --upgrade -r requirements-dev.txt
-	$(PY) -m pip install --upgrade pip
-
-check: ## Manually run all precommit hooks
-	./venv/bin/pre-commit install
-	./venv/bin/pre-commit run --all-files
+check: ## Run code quality tools.
+	@echo "🚀 Checking lock file consistency with 'pyproject.toml'"
+	@uv lock --locked
+	@echo "🚀 Linting code: Running pre-commit"
+	@uv run pre-commit run -a
 
 check-tool: ## Manually run a single pre-commit hook
-	./venv/bin/pre-commit run $(TOOL) --all-files
+	@echo "🚀 Running pre-commit hook: $(TOOL)"
+	@uv run pre-commit run $(TOOL) --all-files
 
-clean: ## Clean package
-	find . -type d -name '__pycache__' | xargs rm -rf
-	rm -rf build dist
+upgrade: ## Upgrade all dependencies to their latest versions
+	@echo "🚀 Upgrading all dependencies"
+	@uv lock --upgrade
 
-run: ## Runs the application
-	./venv/bin/python3 main.py
+test: ## Run all unit tests
+	@echo "🚀 Running unit tests"
+	@uv run pytest -v
 
-package: clean check ## Run installer
-	./venv/bin/pyinstaller main.spec
+test-single: ## Run a single test file (usage: make test-single TEST=test_config.py)
+	@echo "🚀 Running single test: $(TEST)"
+	@uv run pytest -v tests/$(TEST)
 
-install-macosx: package ## Installs application in users Application folder
-	./scripts/install-macosx.sh AnnotateIt.app
+run: ## Run the application
+	@echo "🚀 Running $(PROJECTNAME)"
+	@uv run annotate-it
+
+clean: ## Clean build artifacts
+	@echo "🚀 Removing build artifacts"
+	@find . -type f -name "*.pyc" -delete
+	@find . -type d -name "__pycache__" -delete
+	@find . -type d -name "*.egg-info" -delete
+	@rm -rf build/ dist/
 
 context: clean ## Build context file from application sources
 	llm-context-builder.py --extensions .py --ignored_dirs build dist generated venv .venv .idea .aider.tags.cache.v3 --print_contents --temp_file
 
-.PHONY: help
-.DEFAULT_GOAL := help
+package: clean ## Run installer
+	@uv run pyinstaller main.spec --clean
 
-help: Makefile
-	echo
-	echo " Choose a command run in "$(PROJECTNAME)":"
-	echo
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-	echo
+install-macosx: package ## Installs application in users Application folder
+	./scripts/install-macosx.sh AnnotateIt.app
+
+setup: ## One command setup
+	@make install-macosx
+	@echo "Installation completed"
+
+.PHONY: help
+help:
+	@uv run python -c "import re; \
+	[[print(f'\033[36m{m[0]:<20}\033[0m {m[1]}') for m in re.findall(r'^([a-zA-Z_-]+):.*?## (.*)$$', open(makefile).read(), re.M)] for makefile in ('$(MAKEFILE_LIST)').strip().split()]"
+
+.DEFAULT_GOAL := help

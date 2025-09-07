@@ -12,20 +12,21 @@ This script demonstrates various aspects of DPI scaling in PyQt6:
 
 import sys
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtWidgets import QComboBox
-from PyQt6.QtWidgets import QGridLayout
-from PyQt6.QtWidgets import QGroupBox
-from PyQt6.QtWidgets import QHBoxLayout
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtWidgets import QMainWindow
-from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtWidgets import QTextEdit
-from PyQt6.QtWidgets import QVBoxLayout
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class DPIScalingTest(QMainWindow):
@@ -100,9 +101,7 @@ class DPIScalingTest(QMainWindow):
         policy_layout.addWidget(QLabel("Scale Factor Rounding Policy:"))
 
         self.policy_combo = QComboBox()
-        self.policy_combo.addItems(
-            ["Round", "Ceil", "Floor", "RoundPreferFloor", "PassThrough"]
-        )
+        self.policy_combo.addItems(["Round", "Ceil", "Floor", "RoundPreferFloor", "PassThrough"])
         self.policy_combo.currentTextChanged.connect(self.change_rounding_policy)
         policy_layout.addWidget(self.policy_combo)
         layout.addLayout(policy_layout)
@@ -211,9 +210,7 @@ class DPIScalingTest(QMainWindow):
         # Application-level DPI info
         app = QApplication.instance()
         self.output_text.append("High DPI scaling: Enabled by default in PyQt6")
-        self.output_text.append(
-            f"Use high DPI pixmaps: {app.testAttribute(Qt.AA_UseHighDpiPixmaps)}"
-        )
+        self.output_text.append(f"Use high DPI pixmaps: {app.testAttribute(Qt.AA_UseHighDpiPixmaps)}")
 
         # Screen analysis
         screens = QApplication.screens()
@@ -221,27 +218,19 @@ class DPIScalingTest(QMainWindow):
 
         for i, screen in enumerate(screens):
             self.output_text.append(f"\nScreen {i}: {screen.name()}")
-            self.output_text.append(
-                f"  Geometry: {screen.geometry().width()}x{screen.geometry().height()}"
-            )
+            self.output_text.append(f"  Geometry: {screen.geometry().width()}x{screen.geometry().height()}")
             self.output_text.append(
                 f"  Available: {screen.availableGeometry().width()}x{screen.availableGeometry().height()}"
             )
-            self.output_text.append(
-                f"  Device Pixel Ratio: {screen.devicePixelRatio():.2f}"
-            )
+            self.output_text.append(f"  Device Pixel Ratio: {screen.devicePixelRatio():.2f}")
             self.output_text.append(f"  Logical DPI: {screen.logicalDotsPerInch():.1f}")
-            self.output_text.append(
-                f"  Physical DPI: {screen.physicalDotsPerInch():.1f}"
-            )
+            self.output_text.append(f"  Physical DPI: {screen.physicalDotsPerInch():.1f}")
             self.output_text.append(f"  Refresh Rate: {screen.refreshRate():.1f} Hz")
 
             # DPI scaling analysis
             dpr = screen.devicePixelRatio()
             if dpr > 1.5:
-                self.output_text.append(
-                    f"  → High DPI display detected (scale: {dpr:.1f}x)"
-                )
+                self.output_text.append(f"  → High DPI display detected (scale: {dpr:.1f}x)")
             elif dpr > 1.0:
                 self.output_text.append(f"  → Medium DPI display (scale: {dpr:.1f}x)")
             else:
@@ -254,9 +243,7 @@ def demonstrate_dpi_attributes():
 
     # These attributes should be set BEFORE creating QApplication
     print("\nDPI attributes in PyQt6:")
-    print(
-        "- High DPI scaling is ENABLED BY DEFAULT (no need to set AA_EnableHighDpiScaling)"
-    )
+    print("- High DPI scaling is ENABLED BY DEFAULT (no need to set AA_EnableHighDpiScaling)")
     print("- Qt.AA_UseHighDpiPixmaps: Use high DPI versions of pixmaps")
     print("- Qt.AA_DisableHighDpiScaling: Disable high DPI scaling (if needed)")
 
@@ -280,9 +267,7 @@ def main():
     app = QApplication(sys.argv)
 
     # Set high DPI scale factor rounding policy
-    app.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
+    app.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
     # Demonstrate DPI attributes
     demonstrate_dpi_attributes()
