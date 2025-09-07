@@ -82,23 +82,11 @@ Changes to colors are applied immediately after closing the configuration dialog
 
 ## Getting Started
 
-* Install the required dependencies:
+Download this repo (either clone it or download the zip file)
 
-```shell
-make setup deps
-```
+Run the `install.command` script to install this application.
 
-* Run the application:
-
-```shell
-make run
-```
-
-* Create application for macOS and move it to ~/Applications
-
-```shell
-make install-macosx
-```
+After installation, you can run the application from the $USER/Applications folder.
 
 ## Contributing
 
