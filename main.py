@@ -141,8 +141,10 @@ class TransparentWindow(QWidget):
         self.mouse_mask_alpha = 128
         # Magnifier (macOS native) state
         self.show_magnifier = False
-        self.magnifier_radius = 120
-        self.magnifier_factor = 2.0
+        self.magnifier_radii = [120, 240, 480]  # Current size, 2x bigger, 4x bigger
+        self.current_magnifier_index = 0
+        self.magnifier_radius = self.magnifier_radii[self.current_magnifier_index]
+        self.magnifier_factor = 2.0  # Keep zoom factor constant at 2x
         self._below_snapshot = None  # QPixmap of the content below this window
         self.update_timer.setInterval(16)  # ~60 FPS
         QTimer.singleShot(1000, self.toggle_halo)
@@ -224,6 +226,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("Ctrl+,"), self, self.show_config_dialog),
             QShortcut(QKeySequence("Shift+F"), self, self.toggle_flashlight),
             QShortcut(QKeySequence("Z"), self, self.toggle_magnifier),
+            QShortcut(QKeySequence("Shift+Z"), self, self.cycle_magnifier_size),
         ]
 
     def export_to_image(self):
@@ -508,6 +511,33 @@ class TransparentWindow(QWidget):
         self._manage_update_timer()
         self.update()
         print(f"Magnifier {'enabled' if self.show_magnifier else 'disabled'}")
+
+    def cycle_magnifier_size(self):
+        """Cycle through different magnifier window sizes (current, 2x bigger, 4x bigger)."""
+        if not IS_MAC or not MAC_NATIVE_CAPTURE_AVAILABLE:
+            if not getattr(self, "_magnifier_warned", False):
+                print("Magnifier is only available on macOS with PyObjC/Quartz installed.")
+                self._magnifier_warned = True
+            return
+
+        # If magnifier is not currently shown, enable it first
+        if not self.show_magnifier:
+            self.toggle_magnifier()
+            return
+
+        # Cycle to next magnifier window size
+        self.current_magnifier_index = (self.current_magnifier_index + 1) % len(self.magnifier_radii)
+        self.magnifier_radius = self.magnifier_radii[self.current_magnifier_index]
+
+        # Update display
+        self.update()
+
+        # Print current window size
+        size_multiplier = self.current_magnifier_index + 1
+        if size_multiplier == 1:
+            print("Magnifier: Current window size")
+        else:
+            print(f"Magnifier: {size_multiplier}x bigger window size")
 
     def _macos_request_screen_capture_access(self) -> bool:
         """Check/request macOS Screen Recording permission. Returns True if available."""
@@ -912,6 +942,7 @@ class ConfigDialog(QDialog):
             ("M", "Toggle Mouse Mask"),
             ("Shift+F", "Toggle Flashlight Effect"),
             ("Z", "Toggle Magnifier (macOS only)"),
+            ("Shift+Z", "Cycle Magnifier Window Size (macOS only)"),
         ]
 
         for i, (key, description) in enumerate(shortcuts):
