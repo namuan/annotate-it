@@ -1190,8 +1190,23 @@ class TransparentWindow(QWidget):
             if not window_id:
                 self._below_snapshot = None
                 return
+
+            # Get the current screen to handle multi-monitor coordinate systems properly
+            current_screen = self.target_screen if self.target_screen else self.screen()
+            if not current_screen:
+                self.logger.debug("Cannot determine current screen for magnifier")
+                self._below_snapshot = None
+                return
+
+            # Capture only the current screen instead of the entire virtual desktop
+            # This fixes the coordinate system issue in multi-monitor setups
+            screen_geom = current_screen.geometry()
+            screen_rect = Quartz.CGRectMake(
+                float(screen_geom.x()), float(screen_geom.y()), float(screen_geom.width()), float(screen_geom.height())
+            )
+
             cgimg = Quartz.CGWindowListCreateImage(
-                Quartz.CGRectInfinite,
+                screen_rect,  # Capture only the current screen, not CGRectInfinite
                 Quartz.kCGWindowListOptionOnScreenBelowWindow,
                 window_id,
                 Quartz.kCGWindowImageDefault,
@@ -1215,19 +1230,48 @@ class TransparentWindow(QWidget):
             qimg = qimg.copy()  # Detach from buffer
             full = QPixmap.fromImage(qimg)
 
-            # Account for HiDPI: crop using pixel coordinates
-            dpr = float(self.devicePixelRatioF()) if hasattr(self, "devicePixelRatioF") else 1.0
+            # Account for HiDPI: crop using pixel coordinates relative to the current screen
+            dpr = float(current_screen.devicePixelRatio())
             self._below_dpr = dpr
 
-            geom = self.frameGeometry()  # logical coords
-            x_px = int(max(0, min(round(geom.x() * dpr), full.width() - 1)))
-            y_px = int(max(0, min(round(geom.y() * dpr), full.height() - 1)))
+            geom = self.frameGeometry()  # logical coords in global coordinate system
+
+            # Convert window coordinates to screen-relative coordinates
+            # This is the key fix for multi-monitor support
+            screen_relative_x = geom.x() - screen_geom.x()
+            screen_relative_y = geom.y() - screen_geom.y()
+
+            # Convert to pixel coordinates for the captured image
+            x_px = int(max(0, min(round(screen_relative_x * dpr), full.width() - 1)))
+            y_px = int(max(0, min(round(screen_relative_y * dpr), full.height() - 1)))
             w_px = int(max(1, min(round(geom.width() * dpr), full.width() - x_px)))
             h_px = int(max(1, min(round(geom.height() * dpr), full.height() - y_px)))
 
             self._below_snapshot = full.copy(QRect(x_px, y_px, w_px, h_px))
-        except Exception:
+
+            self.logger.debug(
+                "Magnifier snapshot updated: screen=%s, window_geom=(%d,%d,%d,%d), "
+                "screen_geom=(%d,%d,%d,%d), screen_relative=(%d,%d), pixel_crop=(%d,%d,%d,%d)",
+                current_screen.name(),
+                geom.x(),
+                geom.y(),
+                geom.width(),
+                geom.height(),
+                screen_geom.x(),
+                screen_geom.y(),
+                screen_geom.width(),
+                screen_geom.height(),
+                screen_relative_x,
+                screen_relative_y,
+                x_px,
+                y_px,
+                w_px,
+                h_px,
+            )
+
+        except Exception as e:
             # If anything fails, disable snapshot for this frame; lens will show hint.
+            self.logger.debug("Magnifier snapshot failed: %s", e)
             self._below_snapshot = None
 
     def draw_magnifier(self, qp):
