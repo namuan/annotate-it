@@ -1,6 +1,8 @@
 General Rules:
 
 - Use ast-grep for code searching and refactoring
+- Use `repomap` command to get an overview of a file or files in a directory.
+    Eg. `repomap main.py` or `repomap src/`
 - MUST Add extensive logging to help with debugging as this is a GUI application
 - MUST Run `make check` before starting a new check list item to make sure there aren't any existing issues to resolve
 - Run `make run` to run the application

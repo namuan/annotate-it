@@ -197,6 +197,13 @@ class FloatingMenu(QWidget):
             },
             {"name": "mouse_mask", "text": "M", "tooltip": "Mouse Mask Effect (M)", "shortcut": "M", "type": "effect"},
             {"name": "magnifier", "text": "Z", "tooltip": "Magnifier Effect (Z)", "shortcut": "Z", "type": "effect"},
+            {
+                "name": "passthrough",
+                "text": "P",
+                "tooltip": "Passthrough Mode (Ctrl+\\)",
+                "shortcut": "Ctrl+\\",
+                "type": "effect",
+            },
         ]
 
         # Store effect buttons separately for state management
@@ -366,6 +373,7 @@ class FloatingMenu(QWidget):
             "flashlight": "toggle_flashlight",
             "mouse_mask": "toggle_mouse_mask",
             "magnifier": "toggle_magnifier",
+            "passthrough": "toggle_passthrough_mode",
         }
 
         # Call the appropriate method on parent window
@@ -395,6 +403,7 @@ class FloatingMenu(QWidget):
             "flashlight": "show_flashlight",
             "mouse_mask": "show_mouse_mask",
             "magnifier": "show_magnifier",
+            "passthrough": "passthrough_mode",
         }
 
         if effect_name in state_attributes:
@@ -685,6 +694,14 @@ class TransparentWindow(QWidget):
         self.logger = logging.getLogger(__name__)
         self.logger.info("TransparentWindow initialized with floating menu: %s", self.floating_menu_enabled)
 
+        # Apply passthrough mode if it was loaded from config
+        if self.passthrough_mode:
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            # Also apply to floating menu if it exists
+            if self.floating_menu:
+                self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            self.logger.info("Passthrough mode restored from config: %s", self.passthrough_mode)
+
     def blink_cursor(self):
         """Toggle cursor visibility for text input."""
         if self.is_typing:
@@ -701,6 +718,8 @@ class TransparentWindow(QWidget):
         self.textColor = QColor(config.get("textColor", "#AA26FF"))
         self.lineColor = QColor(config.get("lineColor", "#FFFF00"))
         self.floating_menu_enabled = config.get("floating_menu_enabled", True)
+        # Always start in Draw mode (don't persist passthrough mode)
+        self.passthrough_mode = False
 
     def save_config(self):
         """Save current colors, shape, and settings to config."""
@@ -757,6 +776,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("Z"), self, self.toggle_magnifier),
             QShortcut(QKeySequence("Shift+Z"), self, self.cycle_magnifier_size),
             QShortcut(QKeySequence("Tab"), self, self.toggle_floating_menu),
+            QShortcut(QKeySequence("Ctrl+\\"), self, self.toggle_passthrough_mode),
         ]
 
     def export_to_image(self):
@@ -840,6 +860,75 @@ class TransparentWindow(QWidget):
         if self.floating_menu:
             self.floating_menu.update_effect_state("mouse_mask")
 
+    def toggle_passthrough_mode(self):
+        """Toggle passthrough mode to allow mouse events to pass through to underlying applications."""
+        old_mode = self.passthrough_mode
+        self.passthrough_mode = not self.passthrough_mode
+
+        self.logger.info("Passthrough mode transition: %s -> %s", old_mode, self.passthrough_mode)
+
+        # Apply or restore passthrough mode
+        if self.passthrough_mode:
+            self._apply_passthrough_mode()
+        else:
+            self._restore_draw_mode()
+
+        mode_text = "Pass-through" if self.passthrough_mode else "Draw"
+        print(f"Mode switched to: {mode_text}")
+        self.logger.info("Mode switched to: %s", mode_text)
+
+        # Update floating menu state
+        if self.floating_menu:
+            self.floating_menu.update_effect_state("passthrough")
+
+        # Update visual feedback if needed
+        self.update()
+
+    def _apply_passthrough_mode(self):
+        """Apply passthrough mode using window opacity and mouse interaction."""
+        try:
+            # Make the window almost invisible and disable mouse interaction
+            self.setWindowOpacity(0.01)  # Almost invisible but still present
+            self.setMouseTracking(False)
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+            # Also apply to floating menu
+            if self.floating_menu:
+                self.floating_menu.setWindowOpacity(0.01)
+                self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+            self.logger.info("Passthrough mode applied")
+
+        except Exception as e:
+            self.logger.warning("Passthrough mode application failed: %s", e)
+
+    def _restore_draw_mode(self):
+        """Restore draw mode from passthrough mode."""
+        try:
+            # Restore full opacity
+            self.setWindowOpacity(1.0)
+
+            # Re-enable mouse interaction
+            self.setMouseTracking(True)
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+
+            # Ensure window is active and focused
+            self.raise_()
+            self.activateWindow()
+            self.setFocus()
+
+            # Also restore floating menu
+            if self.floating_menu:
+                self.floating_menu.setWindowOpacity(1.0)
+                self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+                if self.floating_menu.is_visible:
+                    self.floating_menu.raise_()
+
+            self.logger.info("Draw mode restored")
+
+        except Exception as e:
+            self.logger.warning("Draw mode restoration failed: %s", e)
+
     def _manage_update_timer(self):
         """Start or stop update timer based on active effects."""
         if self.show_flashlight or self.show_halo or self.show_mouse_mask or self.show_magnifier:
@@ -879,6 +968,9 @@ class TransparentWindow(QWidget):
             # Create floating menu if it doesn't exist
             if not self.floating_menu:
                 self.floating_menu = FloatingMenu(self)
+                # Apply current passthrough mode to the new floating menu
+                if self.passthrough_mode:
+                    self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
                 self.logger.info("Floating menu enabled and created")
         else:
             # Hide and destroy floating menu if it exists
@@ -953,6 +1045,10 @@ class TransparentWindow(QWidget):
             self.draw_mouse_mask(qp)
         if self.show_magnifier:
             self.draw_magnifier(qp)
+
+        # Draw passthrough mode visual indicator
+        if self.passthrough_mode:
+            self.draw_passthrough_indicator(qp)
 
     def _draw_current_shape(self, qp):
         """Draw the current shape being created."""
@@ -1068,6 +1164,28 @@ class TransparentWindow(QWidget):
         inner_path.addEllipse(center, radius, radius)
         mask_path = outer_path.subtracted(inner_path)
         qp.fillPath(mask_path, QColor(0, 0, 0, self.mouse_mask_alpha))
+
+    def draw_passthrough_indicator(self, qp):
+        """Draw visual indicator for passthrough mode."""
+        # Draw a subtle blue tint overlay to indicate passthrough mode
+        qp.setBrush(QColor(0, 150, 255, 15))  # Light blue with very low opacity
+        qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawRect(self.rect())
+
+        # Draw a small indicator in the top-right corner
+        indicator_size = 20
+        margin = 10
+        indicator_rect = QRect(self.width() - indicator_size - margin, margin, indicator_size, indicator_size)
+
+        # Draw the indicator circle
+        qp.setBrush(QColor(0, 150, 255, 120))  # More opaque blue for the indicator
+        qp.setPen(QPen(QColor(255, 255, 255, 180), 2))  # White border
+        qp.drawEllipse(indicator_rect)
+
+        # Draw "P" text in the indicator
+        qp.setPen(QColor(255, 255, 255, 220))  # White text
+        qp.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        qp.drawText(indicator_rect, Qt.AlignmentFlag.AlignCenter, "P")
 
     def toggle_magnifier(self):
         """Toggle macOS-native magnifier (captures below this window)."""
@@ -1400,6 +1518,16 @@ class TransparentWindow(QWidget):
 
     def mousePressEvent(self, event):
         """Handle mouse press for starting drawings or text."""
+        self.logger.debug(
+            "Mouse press event received - Button: %s, Position: (%d, %d), Passthrough mode: %s",
+            event.button(),
+            event.position().x(),
+            event.position().y(),
+            self.passthrough_mode,
+        )
+        if self.passthrough_mode:
+            self.logger.debug("Mouse press ignored due to passthrough mode")
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             if self.shape == "text":
                 if self.is_typing and self.current_text:
@@ -1480,12 +1608,44 @@ class TransparentWindow(QWidget):
     def mouseMoveEvent(self, event):
         """Handle mouse movement for updating cursor and drawing."""
         self.cursor_pos = event.position().toPoint()
+
+        # Log mouse move events only when drawing or in debug mode
+        if self.drawing or self.passthrough_mode:
+            self.logger.debug(
+                "Mouse move event - Position: (%d, %d), Drawing: %s, Passthrough mode: %s",
+                event.position().x(),
+                event.position().y(),
+                self.drawing,
+                self.passthrough_mode,
+            )
+
+        if self.passthrough_mode and not self.drawing:
+            # In passthrough mode, we still update cursor position for visual effects but don't handle drawing
+            self.update()
+            return
+
         if self.drawing:
             self.currentShape["end"] = self.cursor_pos
+            self.logger.debug(
+                "Updating current shape end position to (%d, %d)", self.cursor_pos.x(), self.cursor_pos.y()
+            )
         self.update()
 
     def mouseReleaseEvent(self, event):
         """Handle mouse release for completing drawings."""
+        self.logger.debug(
+            "Mouse release event received - Button: %s, Position: (%d, %d), Drawing: %s, Passthrough mode: %s",
+            event.button(),
+            event.position().x(),
+            event.position().y(),
+            self.drawing,
+            self.passthrough_mode,
+        )
+
+        if self.passthrough_mode:
+            self.logger.debug("Mouse release ignored due to passthrough mode")
+            return
+
         if event.button() == Qt.MouseButton.LeftButton and self.drawing:
             self.drawing = False
             end_point = event.position().toPoint()
@@ -1496,6 +1656,7 @@ class TransparentWindow(QWidget):
             self.currentShape = None
             self.redoStack.clear()
             print(f"{self.shape.capitalize()} drawn")
+            self.logger.debug("Shape completed and added to shapes list: %s", self.shape)
             self.update()
 
     def draw_arrow(self, qp, start, end):
@@ -1568,6 +1729,7 @@ class ConfigDialog(QDialog):
             ("Shift+F", "Toggle Flashlight Effect"),
             ("Z", "Toggle Magnifier (macOS only)"),
             ("Shift+Z", "Cycle Magnifier Window Size (macOS only)"),
+            ("Ctrl+\\", "Toggle Passthrough Mode (Draw ↔ Pass-through)"),
         ]
 
         for i, (key, description) in enumerate(shortcuts):

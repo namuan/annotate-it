@@ -23,6 +23,7 @@ The application also supports the following methods to track or highlight the cu
 * **Flashlight Effect**: Creates a glowing circular effect around the cursor with a yellow gradient, simulating a flashlight. Toggled with the 'Shift+F' key.
 * **Mouse Mask Effect**: Applies a semi-transparent overlay across the screen, with a clear circular area around the cursor to highlight it. Toggled with the 'M' key.
 * **Magnifier Effect**: Shows a circular magnified view of the screen content below the cursor with 2x zoom factor and configurable window sizes: current size, 2x bigger, and 4x bigger (macOS only, requires Screen Recording permission). Toggled with the 'Z' key, window size cycled with 'Shift+Z'.
+* **Passthrough Mode**: Allows switching between "Draw" mode (default) and "Pass-through" mode where mouse events pass through the overlay to underlying applications, enabling interaction with apps below while maintaining the visual overlay. Features a subtle blue tint and corner indicator when active. Toggled with 'Ctrl+\'.
 
 ## Floating Menu
 
@@ -64,6 +65,7 @@ Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to quickly view all shortcuts.
 - `Ctrl+Z`: Undo last action
 - `Ctrl+Y`: Redo last undone action
 - `Ctrl+,`: Open configuration dialog
+- `Ctrl+\`: Toggle passthrough mode (Draw ↔ Pass-through)
 - `Tab`: Toggle floating menu visibility
 
 ## Configuration
