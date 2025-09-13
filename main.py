@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -86,6 +87,183 @@ class ConfigManager:
                 json.dump(config, f, indent=2)
         except OSError as e:
             print(f"Error saving config: {e}")
+
+    def get_monitor_preferences(self):
+        """Get monitor preference settings from config."""
+        config = self.load_config()
+        return {
+            "preferred_monitor_id": config.get("preferred_monitor_id"),
+            "preferred_monitor_name": config.get("preferred_monitor_name"),
+            "monitor_validation_enabled": config.get("monitor_validation_enabled", True),
+        }
+
+    def save_monitor_preferences(self, preferred_monitor_id, preferred_monitor_name, validation_enabled=True):
+        """Save monitor preference settings to config."""
+        config = self.load_config()
+        config["preferred_monitor_id"] = preferred_monitor_id
+        config["preferred_monitor_name"] = preferred_monitor_name
+        config["monitor_validation_enabled"] = validation_enabled
+        self.save_config(config)
+
+    def clear_monitor_preferences(self):
+        """Clear saved monitor preferences."""
+        config = self.load_config()
+        config.pop("preferred_monitor_id", None)
+        config.pop("preferred_monitor_name", None)
+        config.pop("monitor_validation_enabled", None)
+        self.save_config(config)
+
+
+class MonitorPreferenceManager:
+    """Manages monitor identification and preference persistence."""
+
+    def __init__(self, config_manager):
+        self.config_manager = config_manager
+        self.logger = logging.getLogger(__name__)
+
+    def create_monitor_id(self, screen):
+        """Create a unique identifier for a monitor using name and geometry."""
+        geometry = screen.geometry()
+        monitor_data = {
+            "name": screen.name(),
+            "width": geometry.width(),
+            "height": geometry.height(),
+            "x": geometry.x(),
+            "y": geometry.y(),
+        }
+
+        # Create hash from monitor characteristics
+        monitor_string = json.dumps(monitor_data, sort_keys=True)
+        monitor_hash = hashlib.sha256(monitor_string.encode()).hexdigest()[:8]
+
+        self.logger.debug(
+            "Created monitor ID %s for %s at %s,%s", monitor_hash, screen.name(), geometry.x(), geometry.y()
+        )
+        return monitor_hash
+
+    def save_monitor_preference(self, screen):
+        """Save the selected monitor as the preferred choice."""
+        monitor_id = self.create_monitor_id(screen)
+        config = self.config_manager.load_config()
+        config["preferred_monitor_id"] = monitor_id
+        config["preferred_monitor_name"] = screen.name()
+
+        self.config_manager.save_config(config)
+        self.logger.info("Saved monitor preference: %s (ID: %s)", screen.name(), monitor_id)
+
+    def get_preferred_monitor_id(self):
+        """Get the saved preferred monitor ID."""
+        config = self.config_manager.load_config()
+        return config.get("preferred_monitor_id")
+
+    def find_preferred_monitor(self, screens):
+        """Find the preferred monitor among available screens with edge case handling."""
+        preferred_id = self.get_preferred_monitor_id()
+        if not preferred_id:
+            self.logger.debug("No preferred monitor ID found")
+            return None
+
+        self.logger.debug("Looking for preferred monitor ID: %s", preferred_id)
+
+        # Try exact match first
+        for screen in screens:
+            current_id = self.create_monitor_id(screen)
+            self.logger.debug("Checking screen %s with ID: %s", screen.name(), current_id)
+            if current_id == preferred_id:
+                self.logger.info("Found exact match for preferred monitor: %s", screen.name())
+                return screen
+
+        # Handle edge cases: try fallback matching strategies
+        config = self.config_manager.load_config()
+        preferred_name = config.get("preferred_monitor_name")
+
+        if preferred_name:
+            # Try to match by name only (handles resolution changes)
+            for screen in screens:
+                if screen.name() == preferred_name:
+                    self.logger.warning("Monitor %s found but geometry changed, using anyway", preferred_name)
+                    # Update the stored ID to reflect new geometry
+                    self.save_monitor_preference(screen)
+                    return screen
+
+            # Try partial name matching (handles driver updates that change names)
+            for screen in screens:
+                if preferred_name.lower() in screen.name().lower() or screen.name().lower() in preferred_name.lower():
+                    self.logger.warning("Partial name match: %s ~ %s", screen.name(), preferred_name)
+                    self.save_monitor_preference(screen)
+                    return screen
+
+        # Log detailed information about the failure
+        available_info = []
+        for screen in screens:
+            geometry = screen.geometry()
+            screen_id = self.create_monitor_id(screen)
+            available_info.append(f"{screen.name()}({screen_id}): {geometry.width()}x{geometry.height()}")
+
+        self.logger.warning("Preferred monitor not found. Wanted: %s(%s)", preferred_name, preferred_id)
+        self.logger.warning("Available monitors: %s", ", ".join(available_info))
+        return None
+
+    def validate_monitor_configuration(self, screens):
+        """Validate current monitor configuration and log details."""
+        self.logger.info("Detected %d monitor(s):", len(screens))
+
+        # Get primary screen for comparison
+        app = QApplication.instance()
+        primary_screen = app.primaryScreen() if app else None
+
+        for i, screen in enumerate(screens):
+            geometry = screen.geometry()
+            monitor_id = self.create_monitor_id(screen)
+            is_primary = screen == primary_screen
+            primary_indicator = " (PRIMARY)" if is_primary else ""
+
+            self.logger.info(
+                "  Monitor %d: %s (%dx%d) ID: %s%s",
+                i + 1,
+                screen.name(),
+                geometry.width(),
+                geometry.height(),
+                monitor_id,
+                primary_indicator,
+            )
+
+            # Log additional details for debugging
+            self.logger.debug("    Position: (%d, %d)", geometry.x(), geometry.y())
+            self.logger.debug(
+                "    DPI: %.1f logical, %.1f physical", screen.logicalDotsPerInch(), screen.physicalDotsPerInch()
+            )
+            self.logger.debug("    Scale: %.1fx", screen.devicePixelRatio())
+
+    def handle_monitor_configuration_change(self, screens):
+        """Handle changes in monitor configuration (disconnection, resolution changes, etc.)."""
+        self.logger.info("Monitor configuration change detected")
+
+        # Re-validate the configuration
+        self.validate_monitor_configuration(screens)
+
+        # Check if preferred monitor is still available
+        preferred_monitor = self.find_preferred_monitor(screens)
+
+        if not preferred_monitor:
+            self.logger.warning("Preferred monitor no longer available after configuration change")
+            # Could implement auto-fallback to primary monitor here
+            return None
+        self.logger.info("Preferred monitor still available: %s", preferred_monitor.name())
+        return preferred_monitor
+
+    def cleanup_invalid_preferences(self):
+        """Clean up preferences for monitors that no longer exist."""
+        app = QApplication.instance()
+        if not app:
+            return
+
+        screens = app.screens()
+        preferred_monitor = self.find_preferred_monitor(screens)
+
+        if not preferred_monitor:
+            self.logger.info("Cleaning up invalid monitor preferences")
+            self.config_manager.clear_monitor_preferences()
 
 
 class QColorButton(QPushButton):
@@ -723,7 +901,11 @@ class TransparentWindow(QWidget):
 
     def save_config(self):
         """Save current colors, shape, and settings to config."""
-        config = {
+        # Load existing config to preserve monitor preferences and other settings
+        config = self.config_manager.load_config()
+
+        # Update only the UI-related settings
+        config.update({
             "shape": self.shape,
             "arrowColor": self.arrowColor.name(),
             "rectColor": self.rectColor.name(),
@@ -731,7 +913,7 @@ class TransparentWindow(QWidget):
             "textColor": self.textColor.name(),
             "lineColor": self.lineColor.name(),
             "floating_menu_enabled": self.floating_menu_enabled,
-        }
+        })
         self.config_manager.save_config(config)
 
     def closeEvent(self, event):
@@ -1703,13 +1885,22 @@ class ConfigDialog(QDialog):
         self.setMinimumHeight(500)
 
     def init_ui(self):
-        """Initialize UI for config dialog."""
-        self.setWindowTitle("Keyboard Shortcuts")
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
+        """Initialize UI for config dialog with two-column layout."""
+        self.setWindowTitle("Configuration Settings")
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
 
-        grid = QGridLayout()
-        grid.setSpacing(8)
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(20)
+
+        # Left column - Keyboard Shortcuts
+        left_column = QVBoxLayout()
+        shortcuts_label = QLabel("<b>Keyboard Shortcuts</b>")
+        shortcuts_label.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
+        left_column.addWidget(shortcuts_label)
+
+        shortcuts_grid = QGridLayout()
+        shortcuts_grid.setSpacing(8)
         shortcuts = [
             ("L", "Line Tool"),
             ("A", "Arrow Tool"),
@@ -1734,13 +1925,25 @@ class ConfigDialog(QDialog):
 
         for i, (key, description) in enumerate(shortcuts):
             key_label = QLabel(f"<b>{key}</b>")
+            key_label.setMinimumWidth(80)
             desc_label = QLabel(description)
             desc_label.setWordWrap(True)
-            grid.addWidget(key_label, i, 0)
-            grid.addWidget(desc_label, i, 1)
+            shortcuts_grid.addWidget(key_label, i, 0)
+            shortcuts_grid.addWidget(desc_label, i, 1)
+
+        left_column.addLayout(shortcuts_grid)
+        left_column.addStretch()
+
+        # Right column - Colors and Monitor Settings
+        right_column = QVBoxLayout()
+
+        # Color settings section
+        colors_label = QLabel("<b>Tool Colors</b>")
+        colors_label.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
+        right_column.addWidget(colors_label)
 
         color_layout = QGridLayout()
-        color_layout.setSpacing(8)
+        color_layout.setSpacing(12)
         self.arrow_color = QColorButton(self.parent.arrowColor)
         self.rect_color = QColorButton(self.parent.rectColor)
         self.ellipse_color = QColorButton(self.parent.ellipseColor)
@@ -1758,11 +1961,101 @@ class ConfigDialog(QDialog):
         color_layout.addWidget(QLabel("Line Color:"), 4, 0)
         color_layout.addWidget(self.line_color, 4, 1)
 
-        layout.addLayout(grid)
-        layout.addSpacing(20)
-        layout.addLayout(color_layout)
-        layout.addStretch()
-        self.setLayout(layout)
+        right_column.addLayout(color_layout)
+        right_column.addSpacing(30)
+
+        # Monitor selection section
+        monitor_label = QLabel("<b>Monitor Settings</b>")
+        monitor_label.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
+        right_column.addWidget(monitor_label)
+
+        # Current monitor display
+        self.current_monitor_label = QLabel()
+        self.update_current_monitor_display()
+        right_column.addWidget(self.current_monitor_label)
+
+        # Change monitor button (only show if multiple monitors)
+        screens = QApplication.instance().screens()
+        if len(screens) > 1:
+            self.change_monitor_button = QPushButton("Change Monitor")
+            self.change_monitor_button.clicked.connect(self.change_monitor)
+            right_column.addWidget(self.change_monitor_button)
+
+        right_column.addStretch()
+
+        # Add columns to main layout
+        main_layout.addLayout(left_column, 1)
+        main_layout.addLayout(right_column, 1)
+
+        self.setLayout(main_layout)
+
+    def update_current_monitor_display(self):
+        """Update the display of current monitor information."""
+        current_screen = self.parent.screen() if hasattr(self.parent, "screen") else None
+        if current_screen:
+            geometry = current_screen.geometry()
+            monitor_info = f"Current: {current_screen.name()} ({geometry.width()}x{geometry.height()})"
+        else:
+            monitor_info = "Current: Primary Monitor"
+        self.current_monitor_label.setText(monitor_info)
+
+    def change_monitor(self):
+        """Show monitor selection dialog to change the active monitor."""
+        logger = logging.getLogger(__name__)
+        logger.info("User requested monitor change from config dialog")
+
+        # Create and show monitor selection dialog
+        dialog = MonitorSelectionDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_screen = dialog.get_selected_screen()
+            current_screen = self.parent.screen() if hasattr(self.parent, "screen") else None
+
+            # Check if the selected monitor is the same as current
+            is_same_monitor = (
+                current_screen
+                and current_screen.name() == selected_screen.name()
+                and current_screen.geometry() == selected_screen.geometry()
+            )
+
+            # Save the new monitor preference
+            config_manager = ConfigManager()
+            monitor_manager = MonitorPreferenceManager(config_manager)
+            monitor_manager.save_monitor_preference(selected_screen)
+
+            # Update the display
+            geometry = selected_screen.geometry()
+            if is_same_monitor:
+                monitor_info = (
+                    f"Current: {selected_screen.name()} ({geometry.width()}x{geometry.height()})\nNo restart needed"
+                )
+                self.current_monitor_label.setText(monitor_info)
+                # Hide restart notice if it was previously shown
+                if hasattr(self, "restart_notice"):
+                    self.restart_notice.hide()
+                # Keep button enabled and unchanged so user can select a different monitor
+                logger.info("Monitor preference confirmed (same as current): %s", selected_screen.name())
+            else:
+                monitor_info = f"New: {selected_screen.name()} ({geometry.width()}x{geometry.height()})"
+                self.current_monitor_label.setText(monitor_info)
+
+                # Create and show prominent restart notice under the button
+                if not hasattr(self, "restart_notice"):
+                    self.restart_notice = QLabel("RESTART REQUIRED")
+                    self.restart_notice.setStyleSheet(
+                        "background-color: red; color: white; font-weight: bold; "
+                        "padding: 8px; border-radius: 4px; text-align: center;"
+                    )
+                    self.restart_notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.restart_notice.setFixedHeight(40)
+                    # Find the right column layout and add after the button
+                    right_column_layout = self.layout().itemAt(1).layout()  # Second column (index 1)
+                    right_column_layout.insertWidget(
+                        right_column_layout.count() - 1, self.restart_notice
+                    )  # Before stretch
+
+                self.restart_notice.show()
+                # Keep button enabled so user can change their mind
+                logger.info("Monitor preference changed to: %s", selected_screen.name())
 
     def closeEvent(self, event):
         """Update parent colors on close."""
@@ -2172,19 +2465,45 @@ class MonitorSelectionDialog(QDialog):
 def main():
     app = QApplication(sys.argv)
 
-    # Show monitor selection dialog if multiple monitors are available
+    # Set up logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logger = logging.getLogger(__name__)
+
+    # Initialize configuration and monitor preference managers
+    config_manager = ConfigManager()
+    monitor_manager = MonitorPreferenceManager(config_manager)
+
+    # Get available screens and validate configuration
     screens = app.screens()
+    monitor_manager.validate_monitor_configuration(screens)
     target_screen = None
 
     if len(screens) > 1:
-        dialog = MonitorSelectionDialog()
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            target_screen = dialog.get_selected_screen()
+        # Try to find preferred monitor first
+        preferred_screen = monitor_manager.find_preferred_monitor(screens)
+
+        if preferred_screen:
+            logger.info("Auto-selecting preferred monitor: %s", preferred_screen.name())
+            target_screen = preferred_screen
         else:
-            # User cancelled, exit application
-            sys.exit(0)
+            # No preferred monitor found, show selection dialog
+            logger.info("No preferred monitor found, showing selection dialog")
+            dialog = MonitorSelectionDialog()
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                target_screen = dialog.get_selected_screen()
+                # Save the user's selection as new preference
+                monitor_manager.save_monitor_preference(target_screen)
+                logger.info("User selected and saved new preferred monitor: %s", target_screen.name())
+            else:
+                # User cancelled, exit application
+                logger.info("User cancelled monitor selection, exiting application")
+                sys.exit(0)
+    else:
+        logger.info("Single monitor detected: %s", screens[0].name() if screens else "None")
+        target_screen = screens[0] if screens else None
 
     # Create and show the main window
+    logger.info("Starting application on monitor: %s", target_screen.name() if target_screen else "Primary")
     ex = TransparentWindow(target_screen)
     ex.show()
     sys.exit(app.exec())
