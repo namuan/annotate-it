@@ -361,6 +361,7 @@ class FloatingMenu(QWidget):
             {"name": "rectangle", "text": "R", "tooltip": "Rectangle Tool (R)", "shortcut": "R", "type": "tool"},
             {"name": "ellipse", "text": "E", "tooltip": "Ellipse Tool (E)", "shortcut": "E", "type": "tool"},
             {"name": "text", "text": "T", "tooltip": "Text Tool (T)", "shortcut": "T", "type": "tool"},
+            {"name": "ruler", "text": "U", "tooltip": "Ruler Tool (U)", "shortcut": "U", "type": "tool"},
         ]
 
         # Define visual effects with their properties
@@ -895,6 +896,7 @@ class TransparentWindow(QWidget):
         self.ellipseColor = QColor(config.get("ellipseColor", "#00BFFF"))
         self.textColor = QColor(config.get("textColor", "#AA26FF"))
         self.lineColor = QColor(config.get("lineColor", "#FFFF00"))
+        self.rulerColor = QColor(config.get("rulerColor", "#FF6B35"))
         self.floating_menu_enabled = config.get("floating_menu_enabled", True)
         # Always start in Draw mode (don't persist passthrough mode)
         self.passthrough_mode = False
@@ -912,6 +914,7 @@ class TransparentWindow(QWidget):
             "ellipseColor": self.ellipseColor.name(),
             "textColor": self.textColor.name(),
             "lineColor": self.lineColor.name(),
+            "rulerColor": self.rulerColor.name(),
             "floating_menu_enabled": self.floating_menu_enabled,
         })
         self.config_manager.save_config(config)
@@ -944,6 +947,7 @@ class TransparentWindow(QWidget):
             QShortcut(QKeySequence("R"), self, lambda: self.set_shape("rectangle")),
             QShortcut(QKeySequence("E"), self, lambda: self.set_shape("ellipse")),
             QShortcut(QKeySequence("T"), self, lambda: self.set_shape("text")),
+            QShortcut(QKeySequence("U"), self, lambda: self.set_shape("ruler")),
             QShortcut(QKeySequence("H"), self, self.toggle_halo),
             QShortcut(QKeySequence("M"), self, self.toggle_mouse_mask),
             QShortcut(QKeySequence("F"), self, self.toggle_filled_shapes),
@@ -1267,6 +1271,8 @@ class TransparentWindow(QWidget):
                 )
             )
             qp.drawLine(start, end)
+        elif shape_type == "ruler":
+            self.draw_ruler(qp, start, end, opacity)
 
     def _draw_current_text(self, qp):
         """Draw the current text being typed."""
@@ -1289,6 +1295,7 @@ class TransparentWindow(QWidget):
             "rectangle": self.rectColor,
             "ellipse": self.ellipseColor,
             "text": self.textColor,
+            "ruler": self.rulerColor,
         }
         return shape_colors.get(self.shape, QColor(128, 128, 128))
 
@@ -1782,6 +1789,8 @@ class TransparentWindow(QWidget):
                 )
             )
             qp.drawLine(shape["start"], shape["end"])
+        elif shape_type == "ruler":
+            self.draw_ruler(qp, shape["start"], shape["end"], opacity)
         elif shape_type == "text":
             qp.setPen(QPen(self.textColor))
             qp.setFont(self.font)
@@ -1866,6 +1875,89 @@ class TransparentWindow(QWidget):
         qp.drawLine(end, left)
         qp.drawLine(end, right)
 
+    def draw_ruler(self, qp, start, end, opacity=None):
+        """Draw a ruler with distance and angle measurements."""
+        if opacity is None:
+            opacity = self.current_opacity
+
+        # Draw the ruler line
+        color = self.get_color_with_opacity(self.rulerColor, opacity)
+        qp.setPen(QPen(color, 3, Qt.PenStyle.SolidLine))
+        qp.drawLine(start, end)
+
+        # Calculate distance and angle
+        dx = end.x() - start.x()
+        dy = end.y() - start.y()
+        distance = ((dx**2) + (dy**2)) ** 0.5
+
+        # Calculate angle in degrees
+        angle_rad = 0
+        if distance > 0:
+            angle_rad = -1 * (dy / distance)  # Negative for screen coordinates
+            angle_deg = 90 - (angle_rad * 180 / 3.14159)
+            if dx < 0:
+                angle_deg = 360 - angle_deg
+            angle_deg = angle_deg % 360
+        else:
+            angle_deg = 0
+
+        # Create measurement text
+        distance_text = f"{distance:.1f}px"
+        angle_text = f"{angle_deg:.1f}°"
+
+        # Position text at midpoint with offset
+        mid_x = (start.x() + end.x()) // 2
+        mid_y = (start.y() + end.y()) // 2
+
+        # Offset text perpendicular to the line
+        text_offset = 20
+        if distance > 0:
+            perp_dx = -dy / distance * text_offset
+            perp_dy = dx / distance * text_offset
+            text_x = int(mid_x + perp_dx)
+            text_y = int(mid_y + perp_dy)
+        else:
+            text_x = mid_x
+            text_y = mid_y + text_offset
+
+        # Draw measurement text with background
+        text_color = self.get_color_with_opacity(self.rulerColor, opacity)
+        qp.setPen(QPen(text_color))
+        qp.setFont(QFont(self.default_font_family, 12, QFont.Weight.Bold))
+
+        # Draw background rectangle for text
+        metrics = qp.fontMetrics()
+        distance_width = metrics.horizontalAdvance(distance_text)
+        angle_width = metrics.horizontalAdvance(angle_text)
+        max_width = max(distance_width, angle_width)
+        text_height = metrics.height() * 2 + 4  # Two lines of text
+
+        # Background rectangle
+        bg_rect = QRect(text_x - 5, text_y - metrics.height() - 2, max_width + 10, text_height)
+        qp.fillRect(bg_rect, QColor(0, 0, 0, 120))  # Semi-transparent black background
+
+        # Draw text
+        qp.drawText(text_x, text_y, distance_text)
+        qp.drawText(text_x, text_y + metrics.height() + 2, angle_text)
+
+        # Draw small measurement ticks along the line
+        tick_length = 8
+        num_ticks = min(int(distance // 50), 10)  # Max 10 ticks, one every 50px
+        if num_ticks > 1 and distance > 100:
+            for i in range(1, num_ticks):
+                tick_pos = i / num_ticks
+                tick_x = int(start.x() + dx * tick_pos)
+                tick_y = int(start.y() + dy * tick_pos)
+
+                # Perpendicular offset for tick
+                perp_dx_tick = -dy / distance * tick_length
+                perp_dy_tick = dx / distance * tick_length
+
+                tick_start = QPoint(tick_x - int(perp_dx_tick / 2), tick_y - int(perp_dy_tick / 2))
+                tick_end = QPoint(tick_x + int(perp_dx_tick / 2), tick_y + int(perp_dy_tick / 2))
+
+                qp.drawLine(tick_start, tick_end)
+
     def resizeEvent(self, event):
         """Handle window resize by updating drawing layer."""
         self.drawingLayer = QPixmap(self.size())
@@ -1907,6 +1999,7 @@ class ConfigDialog(QDialog):
             ("R", "Rectangle Tool"),
             ("E", "Ellipse Tool"),
             ("T", "Text Tool"),
+            ("U", "Ruler Tool"),
             ("H", "Toggle Halo Effect"),
             ("F", "Toggle Filled Shapes"),
             ("O", "Cycle Opacity (100% → 50% → 25%)"),
@@ -1949,6 +2042,7 @@ class ConfigDialog(QDialog):
         self.ellipse_color = QColorButton(self.parent.ellipseColor)
         self.text_color = QColorButton(self.parent.textColor)
         self.line_color = QColorButton(self.parent.lineColor)
+        self.ruler_color = QColorButton(self.parent.rulerColor)
 
         color_layout.addWidget(QLabel("Arrow Color:"), 0, 0)
         color_layout.addWidget(self.arrow_color, 0, 1)
@@ -1960,6 +2054,8 @@ class ConfigDialog(QDialog):
         color_layout.addWidget(self.text_color, 3, 1)
         color_layout.addWidget(QLabel("Line Color:"), 4, 0)
         color_layout.addWidget(self.line_color, 4, 1)
+        color_layout.addWidget(QLabel("Ruler Color:"), 5, 0)
+        color_layout.addWidget(self.ruler_color, 5, 1)
 
         right_column.addLayout(color_layout)
         right_column.addSpacing(30)
@@ -2064,6 +2160,7 @@ class ConfigDialog(QDialog):
         self.parent.ellipseColor = self.ellipse_color.color
         self.parent.textColor = self.text_color.color
         self.parent.lineColor = self.line_color.color
+        self.parent.rulerColor = self.ruler_color.color
         self.parent.save_config()
         super().closeEvent(event)
 
