@@ -813,6 +813,73 @@ class FloatingMenu(QWidget):
         super().paintEvent(event)
 
 
+class MonitorIndicator(QWidget):
+    """Subtle indicator showing which monitor is currently active."""
+
+    def __init__(self, monitor_name, screen_geometry):
+        super().__init__(None)  # No parent - top-level window
+        self.monitor_name = monitor_name
+        self.screen_geometry = screen_geometry
+        self.init_ui()
+        self.setup_auto_fade()
+
+    def init_ui(self):
+        """Initialize the indicator UI."""
+        # Set window flags first
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+
+        # Create label
+        label = QLabel(f"🖥️  {self.monitor_name}", self)
+        label.setStyleSheet(
+            """
+            QLabel {
+                background-color: rgba(0, 0, 0, 200);
+                color: #00FF00;
+                padding: 15px 30px;
+                border-radius: 10px;
+                font-size: 18px;
+                font-weight: bold;
+                border: 2px solid rgba(0, 255, 0, 100);
+            }
+            """
+        )
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.adjustSize()
+
+        # Set widget size to match label
+        self.setFixedSize(label.size())
+
+        # Position at top center of screen
+        x = self.screen_geometry.x() + (self.screen_geometry.width() - label.width()) // 2
+        y = self.screen_geometry.y() + 40  # 40px from top of screen
+        self.move(x, y)
+
+    def setup_auto_fade(self):
+        """Setup automatic fade out and close after 2 seconds."""
+        # Create fade animation
+        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation.setDuration(500)  # 500ms fade duration
+        self.fade_animation.setStartValue(1.0)
+        self.fade_animation.setEndValue(0.0)
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.fade_animation.finished.connect(self.close)
+
+        # Start fade after 2 seconds
+        QTimer.singleShot(2000, self.start_fade)
+
+    def start_fade(self):
+        """Start the fade out animation."""
+        self.fade_animation.start()
+
+
 class TransparentWindow(QWidget):
     """Main transparent window for drawing annotations on screen."""
 
@@ -880,6 +947,24 @@ class TransparentWindow(QWidget):
             if self.floating_menu:
                 self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             self.logger.info("Passthrough mode restored from config: %s", self.passthrough_mode)
+
+        # Show subtle monitor indicator
+        self.show_monitor_indicator()
+
+    def show_monitor_indicator(self):
+        """Show a subtle indicator of which monitor is active."""
+        monitor_name = "Primary Monitor"
+        screen_geometry = QApplication.primaryScreen().geometry()
+
+        if self.target_screen:
+            monitor_name = self.target_screen.name()
+            screen_geometry = self.target_screen.geometry()
+
+        # Create and show the indicator as a top-level window
+        self.monitor_indicator = MonitorIndicator(monitor_name, screen_geometry)
+        self.monitor_indicator.show()
+        self.monitor_indicator.raise_()
+        self.monitor_indicator.activateWindow()
 
     def blink_cursor(self):
         """Toggle cursor visibility for text input."""
@@ -1910,7 +1995,7 @@ class TransparentWindow(QWidget):
         mid_y = (start.y() + end.y()) // 2
 
         # Offset text perpendicular to the line
-        text_offset = 20
+        text_offset = 30  # Increased from 20 for better visibility
         if distance > 0:
             perp_dx = -dy / distance * text_offset
             perp_dy = dx / distance * text_offset
@@ -1923,25 +2008,25 @@ class TransparentWindow(QWidget):
         # Draw measurement text with background
         text_color = self.get_color_with_opacity(self.rulerColor, opacity)
         qp.setPen(QPen(text_color))
-        qp.setFont(QFont(self.default_font_family, 12, QFont.Weight.Bold))
+        qp.setFont(QFont(self.default_font_family, 18, QFont.Weight.Bold))  # Increased from 12
 
         # Draw background rectangle for text
         metrics = qp.fontMetrics()
         distance_width = metrics.horizontalAdvance(distance_text)
         angle_width = metrics.horizontalAdvance(angle_text)
         max_width = max(distance_width, angle_width)
-        text_height = metrics.height() * 2 + 4  # Two lines of text
+        text_height = metrics.height() * 2 + 12  # Increased from +4
 
-        # Background rectangle
-        bg_rect = QRect(text_x - 5, text_y - metrics.height() - 2, max_width + 10, text_height)
-        qp.fillRect(bg_rect, QColor(0, 0, 0, 120))  # Semi-transparent black background
+        # Background rectangle - increased padding and size
+        bg_rect = QRect(text_x - 10, text_y - metrics.height() - 6, max_width + 20, text_height)  # Increased padding
+        qp.fillRect(bg_rect, QColor(0, 0, 0, 160))  # Increased opacity from 120
 
-        # Draw text
+        # Draw text with increased spacing
         qp.drawText(text_x, text_y, distance_text)
-        qp.drawText(text_x, text_y + metrics.height() + 2, angle_text)
+        qp.drawText(text_x, text_y + metrics.height() + 6, angle_text)  # Increased spacing from +2
 
         # Draw small measurement ticks along the line
-        tick_length = 8
+        tick_length = 12  # Increased from 8
         num_ticks = min(int(distance // 50), 10)  # Max 10 ticks, one every 50px
         if num_ticks > 1 and distance > 100:
             for i in range(1, num_ticks):

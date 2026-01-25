@@ -16,6 +16,7 @@ Annotate-It now supports multiple monitor setups! When you have more than one mo
 * **Rectangle**: Draw rectangular shapes, with an option to fill.
 * **Ellipse**: Draw elliptical shapes, with an option to fill.
 * **Text**: Add text annotations at specific positions.
+* **Ruler**: Measure distances and angles with precise pixel-level measurements. Shows distance in pixels and angle in degrees with large, readable text and measurement ticks.
 
 The application also supports the following methods to track or highlight the cursor:
 
@@ -52,6 +53,7 @@ Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to quickly view all shortcuts.
 - `E/e`: Switch to ellipse drawing mode
 - `T/t`: Switch to text input mode
 - `L/l`: Switch to line drawing mode
+- `U/u`: Switch to ruler measurement mode
 - `F/f`: Toggle filled shapes on/off
 - `O/o`: Cycle through opacity levels (100% → 50% → 25%)
 - `H/h`: Toggle halo effect on/off
@@ -79,6 +81,7 @@ Press `Cmd+,` (or `Ctrl+,` on Windows/Linux) to open the configuration dialog. T
     - Ellipse color
     - Text color
     - Line color
+    - Ruler color
 
 Changes to colors are applied immediately after closing the configuration dialog.
 
