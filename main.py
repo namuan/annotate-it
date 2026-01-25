@@ -6,7 +6,6 @@ import platform
 import sys
 from pathlib import Path
 
-# Third-party Qt imports
 from PyQt6.QtCore import QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
@@ -36,7 +35,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# Optional macOS frameworks imported defensively
 try:
     import objc  # type: ignore[import]
     import Quartz  # type: ignore[import]
@@ -44,7 +42,6 @@ except Exception:
     Quartz = None  # type: ignore[attr-defined]
     objc = None  # type: ignore[attr-defined]
 
-# Platform flags computed after all imports
 IS_MAC = platform.system() == "Darwin"
 MAC_NATIVE_CAPTURE_AVAILABLE = bool(Quartz) if IS_MAC else False
 
@@ -59,11 +56,11 @@ class ConfigManager:
     def get_config_dir(self):
         """Determine the configuration directory based on the platform."""
         home = Path.home()
-        if sys.platform == "darwin":  # macOS
+        if sys.platform == "darwin":
             config_dir = home / "Library" / "Application Support" / self.app_name
-        elif sys.platform == "win32":  # Windows
+        elif sys.platform == "win32":
             config_dir = Path(os.getenv("APPDATA")) / self.app_name
-        else:  # Linux and other Unix-like
+        else:
             config_dir = home / ".config" / self.app_name.lower()
 
         config_dir.mkdir(parents=True, exist_ok=True)
@@ -132,7 +129,6 @@ class MonitorPreferenceManager:
             "y": geometry.y(),
         }
 
-        # Create hash from monitor characteristics
         monitor_string = json.dumps(monitor_data, sort_keys=True)
         monitor_hash = hashlib.sha256(monitor_string.encode()).hexdigest()[:8]
 
@@ -801,12 +797,10 @@ class FloatingMenu(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Semi-transparent background
-        background_color = QColor(0, 0, 0, 180)  # Black with 70% opacity
+        background_color = QColor(0, 0, 0, 180)
         painter.setBrush(background_color)
         painter.setPen(Qt.PenStyle.NoPen)
 
-        # Draw rounded rectangle
         rect = self.rect()
         painter.drawRoundedRect(rect, 15, 15)
 
@@ -817,7 +811,7 @@ class MonitorIndicator(QWidget):
     """Subtle indicator showing which monitor is currently active."""
 
     def __init__(self, monitor_name, screen_geometry):
-        super().__init__(None)  # No parent - top-level window
+        super().__init__(None)
         self.monitor_name = monitor_name
         self.screen_geometry = screen_geometry
         self.init_ui()
@@ -825,7 +819,6 @@ class MonitorIndicator(QWidget):
 
     def init_ui(self):
         """Initialize the indicator UI."""
-        # Set window flags first
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -836,7 +829,6 @@ class MonitorIndicator(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
-        # Create label
         label = QLabel(f"🖥️  {self.monitor_name}", self)
         label.setStyleSheet(
             """
@@ -854,25 +846,21 @@ class MonitorIndicator(QWidget):
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.adjustSize()
 
-        # Set widget size to match label
         self.setFixedSize(label.size())
 
-        # Position at top center of screen
         x = self.screen_geometry.x() + (self.screen_geometry.width() - label.width()) // 2
-        y = self.screen_geometry.y() + 40  # 40px from top of screen
+        y = self.screen_geometry.y() + 40
         self.move(x, y)
 
     def setup_auto_fade(self):
         """Setup automatic fade out and close after 2 seconds."""
-        # Create fade animation
         self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
-        self.fade_animation.setDuration(500)  # 500ms fade duration
+        self.fade_animation.setDuration(500)
         self.fade_animation.setStartValue(1.0)
         self.fade_animation.setEndValue(0.0)
         self.fade_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.fade_animation.finished.connect(self.close)
 
-        # Start fade after 2 seconds
         QTimer.singleShot(2000, self.start_fade)
 
     def start_fade(self):
@@ -914,17 +902,15 @@ class TransparentWindow(QWidget):
         self.show_mouse_mask = False
         self.mouse_mask_radius = 100
         self.mouse_mask_alpha = 128
-        # Magnifier (macOS native) state
         self.show_magnifier = False
-        self.magnifier_radii = [120, 240, 480]  # Current size, 2x bigger, 4x bigger
+        self.magnifier_radii = [120, 240, 480]
         self.current_magnifier_index = 0
         self.magnifier_radius = self.magnifier_radii[self.current_magnifier_index]
-        self.magnifier_factor = 2.0  # Keep zoom factor constant at 2x
-        self._below_snapshot = None  # QPixmap of the content below this window
-        self.update_timer.setInterval(16)  # ~60 FPS
+        self.magnifier_factor = 2.0
+        self._below_snapshot = None
+        self.update_timer.setInterval(16)
         QTimer.singleShot(1000, self.toggle_halo)
 
-        # For keeping text
         self.current_text = ""
         self.current_text_pos = None
         self.is_typing = False
@@ -933,22 +919,18 @@ class TransparentWindow(QWidget):
         self.cursor_timer.timeout.connect(self.blink_cursor)
         self.cursor_timer.start(500)
 
-        # Initialize floating menu (conditionally based on config)
         self.floating_menu = None
         if self.floating_menu_enabled:
             self.floating_menu = FloatingMenu(self)
         self.logger = logging.getLogger(__name__)
         self.logger.info("TransparentWindow initialized with floating menu: %s", self.floating_menu_enabled)
 
-        # Apply passthrough mode if it was loaded from config
         if self.passthrough_mode:
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            # Also apply to floating menu if it exists
             if self.floating_menu:
                 self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             self.logger.info("Passthrough mode restored from config: %s", self.passthrough_mode)
 
-        # Show subtle monitor indicator
         self.show_monitor_indicator()
 
     def show_monitor_indicator(self):
@@ -983,15 +965,12 @@ class TransparentWindow(QWidget):
         self.lineColor = QColor(config.get("lineColor", "#FFFF00"))
         self.rulerColor = QColor(config.get("rulerColor", "#FF6B35"))
         self.floating_menu_enabled = config.get("floating_menu_enabled", True)
-        # Always start in Draw mode (don't persist passthrough mode)
         self.passthrough_mode = False
 
     def save_config(self):
         """Save current colors, shape, and settings to config."""
-        # Load existing config to preserve monitor preferences and other settings
         config = self.config_manager.load_config()
 
-        # Update only the UI-related settings
         config.update({
             "shape": self.shape,
             "arrowColor": self.arrowColor.name(),
@@ -1015,7 +994,6 @@ class TransparentWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # Position window on target screen or maximize on primary screen
         if self.target_screen:
             screen_geometry = self.target_screen.geometry()
             self.setGeometry(screen_geometry)
@@ -1116,7 +1094,6 @@ class TransparentWindow(QWidget):
         self.update()
         print(f"Halo effect {'enabled' if self.show_halo else 'disabled'}")
 
-        # Update floating menu state
         if self.floating_menu:
             self.floating_menu.update_effect_state("halo")
 
@@ -1127,7 +1104,6 @@ class TransparentWindow(QWidget):
         self.update()
         print(f"Mouse mask {'enabled' if self.show_mouse_mask else 'disabled'}")
 
-        # Update floating menu state
         if self.floating_menu:
             self.floating_menu.update_effect_state("mouse_mask")
 
@@ -1138,7 +1114,6 @@ class TransparentWindow(QWidget):
 
         self.logger.info("Passthrough mode transition: %s -> %s", old_mode, self.passthrough_mode)
 
-        # Apply or restore passthrough mode
         if self.passthrough_mode:
             self._apply_passthrough_mode()
         else:
@@ -1148,22 +1123,18 @@ class TransparentWindow(QWidget):
         print(f"Mode switched to: {mode_text}")
         self.logger.info("Mode switched to: %s", mode_text)
 
-        # Update floating menu state
         if self.floating_menu:
             self.floating_menu.update_effect_state("passthrough")
 
-        # Update visual feedback if needed
         self.update()
 
     def _apply_passthrough_mode(self):
         """Apply passthrough mode using window opacity and mouse interaction."""
         try:
-            # Make the window almost invisible and disable mouse interaction
-            self.setWindowOpacity(0.01)  # Almost invisible but still present
+            self.setWindowOpacity(0.01)
             self.setMouseTracking(False)
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
-            # Also apply to floating menu
             if self.floating_menu:
                 self.floating_menu.setWindowOpacity(0.01)
                 self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -1176,19 +1147,15 @@ class TransparentWindow(QWidget):
     def _restore_draw_mode(self):
         """Restore draw mode from passthrough mode."""
         try:
-            # Restore full opacity
             self.setWindowOpacity(1.0)
 
-            # Re-enable mouse interaction
             self.setMouseTracking(True)
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
 
-            # Ensure window is active and focused
             self.raise_()
             self.activateWindow()
             self.setFocus()
 
-            # Also restore floating menu
             if self.floating_menu:
                 self.floating_menu.setWindowOpacity(1.0)
                 self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
@@ -1219,7 +1186,6 @@ class TransparentWindow(QWidget):
         self.save_config()
         print(f"Current shape: {self.shape}")
 
-        # Update floating menu active tool indicator
         if self.floating_menu:
             self.floating_menu.update_active_tool(shape)
 
@@ -1236,15 +1202,12 @@ class TransparentWindow(QWidget):
         self.floating_menu_enabled = not self.floating_menu_enabled
 
         if self.floating_menu_enabled:
-            # Create floating menu if it doesn't exist
             if not self.floating_menu:
                 self.floating_menu = FloatingMenu(self)
-                # Apply current passthrough mode to the new floating menu
                 if self.passthrough_mode:
                     self.floating_menu.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
                 self.logger.info("Floating menu enabled and created")
         else:
-            # Hide and destroy floating menu if it exists
             if self.floating_menu:
                 self.floating_menu.hide_menu()
                 self.floating_menu = None
@@ -1317,7 +1280,6 @@ class TransparentWindow(QWidget):
         if self.show_magnifier:
             self.draw_magnifier(qp)
 
-        # Draw passthrough mode visual indicator
         if self.passthrough_mode:
             self.draw_passthrough_indicator(qp)
 
@@ -1441,37 +1403,30 @@ class TransparentWindow(QWidget):
 
     def draw_passthrough_indicator(self, qp):
         """Draw visual indicator for passthrough mode."""
-        # Draw a subtle blue tint overlay to indicate passthrough mode
-        qp.setBrush(QColor(0, 150, 255, 15))  # Light blue with very low opacity
+        qp.setBrush(QColor(0, 150, 255, 15))
         qp.setPen(Qt.PenStyle.NoPen)
         qp.drawRect(self.rect())
 
-        # Draw a small indicator in the top-right corner
         indicator_size = 20
         margin = 10
         indicator_rect = QRect(self.width() - indicator_size - margin, margin, indicator_size, indicator_size)
 
-        # Draw the indicator circle
-        qp.setBrush(QColor(0, 150, 255, 120))  # More opaque blue for the indicator
-        qp.setPen(QPen(QColor(255, 255, 255, 180), 2))  # White border
+        qp.setBrush(QColor(0, 150, 255, 120))
+        qp.setPen(QPen(QColor(255, 255, 255, 180), 2))
         qp.drawEllipse(indicator_rect)
 
-        # Draw "P" text in the indicator
-        qp.setPen(QColor(255, 255, 255, 220))  # White text
+        qp.setPen(QColor(255, 255, 255, 220))
         qp.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         qp.drawText(indicator_rect, Qt.AlignmentFlag.AlignCenter, "P")
 
     def toggle_magnifier(self):
         """Toggle macOS-native magnifier (captures below this window)."""
         if not IS_MAC or not MAC_NATIVE_CAPTURE_AVAILABLE:
-            # Avoid spamming logs repeatedly; show once per toggle attempt.
             if not getattr(self, "_magnifier_warned", False):
                 print("Magnifier is only available on macOS with PyObjC/Quartz installed.")
                 self._magnifier_warned = True
             return
-        # Determine desired state first
         desired = not self.show_magnifier
-        # When enabling, proactively request Screen Recording permission on macOS 10.15+
         if desired:
             self._macos_request_screen_capture_access()
         self.show_magnifier = desired
@@ -1481,7 +1436,6 @@ class TransparentWindow(QWidget):
         self.update()
         print(f"Magnifier {'enabled' if self.show_magnifier else 'disabled'}")
 
-        # Update floating menu state
         if self.floating_menu:
             self.floating_menu.update_effect_state("magnifier")
 
@@ -1493,19 +1447,15 @@ class TransparentWindow(QWidget):
                 self._magnifier_warned = True
             return
 
-        # If magnifier is not currently shown, enable it first
         if not self.show_magnifier:
             self.toggle_magnifier()
             return
 
-        # Cycle to next magnifier window size
         self.current_magnifier_index = (self.current_magnifier_index + 1) % len(self.magnifier_radii)
         self.magnifier_radius = self.magnifier_radii[self.current_magnifier_index]
 
-        # Update display
         self.update()
 
-        # Print current window size
         size_multiplier = self.current_magnifier_index + 1
         if size_multiplier == 1:
             print("Magnifier: Current window size")
@@ -1522,7 +1472,6 @@ class TransparentWindow(QWidget):
                 preflight_ok = bool(Quartz.CGPreflightScreenCaptureAccess())
             if preflight_ok:
                 return True
-            # Request will show the system permission dialog (only the first time)
             if hasattr(Quartz, "CGRequestScreenCaptureAccess"):
                 granted = bool(Quartz.CGRequestScreenCaptureAccess())
             else:
@@ -1556,7 +1505,6 @@ class TransparentWindow(QWidget):
         except Exception as e:
             logging.debug("Error getting window number: %s", e)
         try:
-            # Second attempt: from windowHandle().winId() (NSView*)
             wh = self.windowHandle()
             if wh is not None:
                 wid2 = int(wh.winId())
@@ -1566,7 +1514,6 @@ class TransparentWindow(QWidget):
                     return int(nswindow2.windowNumber())
         except Exception as e:
             logging.debug("Error getting window number: %s", e)
-        # Warn once to help user diagnose missing ID (and likely permissions)
         if not getattr(self, "_magnifier_id_warned", False):
             print("Magnifier: unable to obtain NSWindow.windowNumber; lens will show hint only.")
             self._magnifier_id_warned = True
@@ -1583,22 +1530,19 @@ class TransparentWindow(QWidget):
                 self._below_snapshot = None
                 return
 
-            # Get the current screen to handle multi-monitor coordinate systems properly
             current_screen = self.target_screen if self.target_screen else self.screen()
             if not current_screen:
                 self.logger.debug("Cannot determine current screen for magnifier")
                 self._below_snapshot = None
                 return
 
-            # Capture only the current screen instead of the entire virtual desktop
-            # This fixes the coordinate system issue in multi-monitor setups
             screen_geom = current_screen.geometry()
             screen_rect = Quartz.CGRectMake(
                 float(screen_geom.x()), float(screen_geom.y()), float(screen_geom.width()), float(screen_geom.height())
             )
 
             cgimg = Quartz.CGWindowListCreateImage(
-                screen_rect,  # Capture only the current screen, not CGRectInfinite
+                screen_rect,
                 Quartz.kCGWindowListOptionOnScreenBelowWindow,
                 window_id,
                 Quartz.kCGWindowImageDefault,
@@ -1619,21 +1563,17 @@ class TransparentWindow(QWidget):
                 bytes_per_row,
                 QImage.Format.Format_ARGB32_Premultiplied,
             )
-            qimg = qimg.copy()  # Detach from buffer
+            qimg = qimg.copy()
             full = QPixmap.fromImage(qimg)
 
-            # Account for HiDPI: crop using pixel coordinates relative to the current screen
             dpr = float(current_screen.devicePixelRatio())
             self._below_dpr = dpr
 
-            geom = self.frameGeometry()  # logical coords in global coordinate system
+            geom = self.frameGeometry()
 
-            # Convert window coordinates to screen-relative coordinates
-            # This is the key fix for multi-monitor support
             screen_relative_x = geom.x() - screen_geom.x()
             screen_relative_y = geom.y() - screen_geom.y()
 
-            # Convert to pixel coordinates for the captured image
             x_px = int(max(0, min(round(screen_relative_x * dpr), full.width() - 1)))
             y_px = int(max(0, min(round(screen_relative_y * dpr), full.height() - 1)))
             w_px = int(max(1, min(round(geom.width() * dpr), full.width() - x_px)))
@@ -1662,27 +1602,23 @@ class TransparentWindow(QWidget):
             )
 
         except Exception as e:
-            # If anything fails, disable snapshot for this frame; lens will show hint.
             self.logger.debug("Magnifier snapshot failed: %s", e)
             self._below_snapshot = None
 
     def draw_magnifier(self, qp):
         """Draw a circular magnifier showing content below this window, in real time."""
-        # Update background snapshot (below this window)
         self._update_below_snapshot()
 
-        center = self.cursor_pos  # logical coords
+        center = self.cursor_pos
         radius = self.magnifier_radius
         factor = self.magnifier_factor
 
-        # Always draw the lens outline so user can see the magnifier is active
         qp.save()
         path = QPainterPath()
         path.addEllipse(QPointF(center), radius, radius)
         qp.setClipPath(path)
 
         if self._below_snapshot is not None:
-            # HiDPI-aware source selection
             dpr = getattr(self, "_below_dpr", 1.0)
             center_px = QPoint(int(round(center.x() * dpr)), int(round(center.y() * dpr)))
             src_size_px = max(1, int(round((2 * radius * dpr) / max(0.01, factor))))
@@ -1696,7 +1632,6 @@ class TransparentWindow(QWidget):
             if not src_rect.isEmpty():
                 dst_rect = QRect(center.x() - radius, center.y() - radius, 2 * radius, 2 * radius)
                 qp.drawPixmap(dst_rect, self._below_snapshot, src_rect)
-                # Optionally overlay annotations magnified as well
                 logical_src_w = max(1, int(round(src_rect.width() / max(0.01, dpr * factor))))
                 logical_src_h = max(1, int(round(src_rect.height() / max(0.01, dpr * factor))))
                 ann_src = QRect(
@@ -1707,7 +1642,6 @@ class TransparentWindow(QWidget):
                 )
                 qp.drawPixmap(dst_rect, self.drawingLayer, ann_src)
         else:
-            # Snapshot unavailable: fill lens with a subtle hint background and text
             qp.fillRect(
                 QRect(center.x() - radius, center.y() - radius, 2 * radius, 2 * radius),
                 QColor(0, 0, 0, 120),
@@ -1721,19 +1655,16 @@ class TransparentWindow(QWidget):
                 Qt.AlignmentFlag.AlignCenter,
                 hint,
             )
-            qp.setClipPath(path)  # restore clip for outline
+            qp.setClipPath(path)
 
-        # Draw lens outline on top with thin double border
         qp.setClipping(False)
         qp.setBrush(Qt.BrushStyle.NoBrush)
 
-        # Outer border (dark)
         outer_pen = QPen(QColor(0, 0, 0, 180))
         outer_pen.setWidth(2)
         qp.setPen(outer_pen)
         qp.drawEllipse(QPointF(center), radius, radius)
 
-        # Inner border (light)
         inner_pen = QPen(QColor(255, 255, 255, 200))
         inner_pen.setWidth(1)
         qp.setPen(inner_pen)
@@ -1885,7 +1816,6 @@ class TransparentWindow(QWidget):
         """Handle mouse movement for updating cursor and drawing."""
         self.cursor_pos = event.position().toPoint()
 
-        # Log mouse move events only when drawing or in debug mode
         if self.drawing or self.passthrough_mode:
             self.logger.debug(
                 "Mouse move event - Position: (%d, %d), Drawing: %s, Passthrough mode: %s",
@@ -1896,7 +1826,6 @@ class TransparentWindow(QWidget):
             )
 
         if self.passthrough_mode and not self.drawing:
-            # In passthrough mode, we still update cursor position for visual effects but don't handle drawing
             self.update()
             return
 
@@ -1965,20 +1894,17 @@ class TransparentWindow(QWidget):
         if opacity is None:
             opacity = self.current_opacity
 
-        # Draw the ruler line
         color = self.get_color_with_opacity(self.rulerColor, opacity)
         qp.setPen(QPen(color, 3, Qt.PenStyle.SolidLine))
         qp.drawLine(start, end)
 
-        # Calculate distance and angle
         dx = end.x() - start.x()
         dy = end.y() - start.y()
         distance = ((dx**2) + (dy**2)) ** 0.5
 
-        # Calculate angle in degrees
         angle_rad = 0
         if distance > 0:
-            angle_rad = -1 * (dy / distance)  # Negative for screen coordinates
+            angle_rad = -1 * (dy / distance)
             angle_deg = 90 - (angle_rad * 180 / 3.14159)
             if dx < 0:
                 angle_deg = 360 - angle_deg
@@ -1986,16 +1912,13 @@ class TransparentWindow(QWidget):
         else:
             angle_deg = 0
 
-        # Create measurement text
         distance_text = f"{distance:.1f}px"
         angle_text = f"{angle_deg:.1f}°"
 
-        # Position text at midpoint with offset
         mid_x = (start.x() + end.x()) // 2
         mid_y = (start.y() + end.y()) // 2
 
-        # Offset text perpendicular to the line
-        text_offset = 30  # Increased from 20 for better visibility
+        text_offset = 30
         if distance > 0:
             perp_dx = -dy / distance * text_offset
             perp_dy = dx / distance * text_offset
@@ -2005,36 +1928,30 @@ class TransparentWindow(QWidget):
             text_x = mid_x
             text_y = mid_y + text_offset
 
-        # Draw measurement text with background
         text_color = self.get_color_with_opacity(self.rulerColor, opacity)
         qp.setPen(QPen(text_color))
-        qp.setFont(QFont(self.default_font_family, 18, QFont.Weight.Bold))  # Increased from 12
+        qp.setFont(QFont(self.default_font_family, 18, QFont.Weight.Bold))
 
-        # Draw background rectangle for text
         metrics = qp.fontMetrics()
         distance_width = metrics.horizontalAdvance(distance_text)
         angle_width = metrics.horizontalAdvance(angle_text)
         max_width = max(distance_width, angle_width)
-        text_height = metrics.height() * 2 + 12  # Increased from +4
+        text_height = metrics.height() * 2 + 12
 
-        # Background rectangle - increased padding and size
-        bg_rect = QRect(text_x - 10, text_y - metrics.height() - 6, max_width + 20, text_height)  # Increased padding
-        qp.fillRect(bg_rect, QColor(0, 0, 0, 160))  # Increased opacity from 120
+        bg_rect = QRect(text_x - 10, text_y - metrics.height() - 6, max_width + 20, text_height)
+        qp.fillRect(bg_rect, QColor(0, 0, 0, 160))
 
-        # Draw text with increased spacing
         qp.drawText(text_x, text_y, distance_text)
-        qp.drawText(text_x, text_y + metrics.height() + 6, angle_text)  # Increased spacing from +2
+        qp.drawText(text_x, text_y + metrics.height() + 6, angle_text)
 
-        # Draw small measurement ticks along the line
-        tick_length = 12  # Increased from 8
-        num_ticks = min(int(distance // 50), 10)  # Max 10 ticks, one every 50px
+        tick_length = 12
+        num_ticks = min(int(distance // 50), 10)
         if num_ticks > 1 and distance > 100:
             for i in range(1, num_ticks):
                 tick_pos = i / num_ticks
                 tick_x = int(start.x() + dx * tick_pos)
                 tick_y = int(start.y() + dy * tick_pos)
 
-                # Perpendicular offset for tick
                 perp_dx_tick = -dy / distance * tick_length
                 perp_dy_tick = dx / distance * tick_length
 
@@ -2112,10 +2029,8 @@ class ConfigDialog(QDialog):
         left_column.addLayout(shortcuts_grid)
         left_column.addStretch()
 
-        # Right column - Colors and Monitor Settings
         right_column = QVBoxLayout()
 
-        # Color settings section
         colors_label = QLabel("<b>Tool Colors</b>")
         colors_label.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
         right_column.addWidget(colors_label)
@@ -2145,17 +2060,14 @@ class ConfigDialog(QDialog):
         right_column.addLayout(color_layout)
         right_column.addSpacing(30)
 
-        # Monitor selection section
         monitor_label = QLabel("<b>Monitor Settings</b>")
         monitor_label.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
         right_column.addWidget(monitor_label)
 
-        # Current monitor display
         self.current_monitor_label = QLabel()
         self.update_current_monitor_display()
         right_column.addWidget(self.current_monitor_label)
 
-        # Change monitor button (only show if multiple monitors)
         screens = QApplication.instance().screens()
         if len(screens) > 1:
             self.change_monitor_button = QPushButton("Change Monitor")
@@ -2164,7 +2076,6 @@ class ConfigDialog(QDialog):
 
         right_column.addStretch()
 
-        # Add columns to main layout
         main_layout.addLayout(left_column, 1)
         main_layout.addLayout(right_column, 1)
 
@@ -2185,13 +2096,11 @@ class ConfigDialog(QDialog):
         logger = logging.getLogger(__name__)
         logger.info("User requested monitor change from config dialog")
 
-        # Create and show monitor selection dialog
         dialog = MonitorSelectionDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_screen = dialog.get_selected_screen()
             current_screen = self.parent.screen() if hasattr(self.parent, "screen") else None
 
-            # Check if the selected monitor is the same as current
             is_same_monitor = (
                 current_screen
                 and current_screen.name() == selected_screen.name()
