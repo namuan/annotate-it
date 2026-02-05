@@ -1913,6 +1913,14 @@ class TransparentWindow(QWidget):
             angle_deg = 0
 
         distance_text = f"{distance:.1f}px"
+
+        # Add physical pixel measurement for High DPI displays
+        screen = self.screen()
+        if screen:
+            dpr = screen.devicePixelRatio()
+            if dpr > 1.0:
+                distance_text += f" ({distance * dpr:.1f}px physical)"
+
         angle_text = f"{angle_deg:.1f}°"
 
         mid_x = (start.x() + end.x()) // 2
